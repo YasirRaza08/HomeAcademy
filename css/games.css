@@ -1,0 +1,636 @@
+/* ==========================================================================
+   HOME ACADEMY — Game Center & Interactive Activities Styles
+   ========================================================================== */
+
+.game-zone-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 0;
+}
+
+.game-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.game-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid var(--ha-border);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ha-navy);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.game-back-btn:hover {
+  background: var(--ha-navy-subtle);
+  border-color: var(--ha-navy);
+}
+
+.game-score-tracker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.score-chip {
+  background: #FFFFFF;
+  border: 1px solid var(--ha-border);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-chip.xp {
+  color: var(--ha-gold-dark);
+  background: var(--ha-gold-light);
+  border-color: #FCE1A8;
+}
+
+.score-chip.streak {
+  color: var(--ha-red);
+  background: var(--ha-red-light);
+  border-color: #FED7DA;
+}
+
+/* ==========================================================================
+   Game 1: Word Scramble
+   ========================================================================== */
+.scramble-box {
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--ha-border);
+  box-shadow: var(--ha-shadow-md);
+  padding: 36px 24px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .scramble-box {
+    padding: 22px 12px;
+    border-radius: var(--radius-lg);
+  }
+}
+
+.scramble-hint-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ha-navy-subtle);
+  color: var(--ha-navy);
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.scramble-slots {
+  display: flex;
+  justify-content: center;
+  gap: clamp(4px, 1.5vw, 10px);
+  margin-bottom: 24px;
+  min-height: 48px;
+  flex-wrap: wrap;
+}
+
+.scramble-slot {
+  width: clamp(34px, 8.5vw, 50px);
+  height: clamp(40px, 9.8vw, 56px);
+  border-bottom: 3px solid var(--ha-navy);
+  background: var(--ha-bg);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.1rem, 3.8vw, 1.6rem);
+  font-weight: 800;
+  color: var(--ha-navy);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.scramble-slot.filled {
+  background: var(--ha-navy-subtle);
+  border-color: var(--ha-red);
+}
+
+.scramble-letters-pool {
+  display: flex;
+  justify-content: center;
+  gap: clamp(4px, 1.5vw, 10px);
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.letter-tile-btn {
+  width: clamp(36px, 9vw, 54px);
+  height: clamp(42px, 10.5vw, 58px);
+  border-radius: var(--radius-md);
+  background: #FFFFFF;
+  border: 2px solid var(--ha-border);
+  box-shadow: 0 4px 0 var(--ha-border);
+  font-size: clamp(1.1rem, 3.8vw, 1.5rem);
+  font-weight: 800;
+  color: var(--ha-navy);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.letter-tile-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--ha-navy);
+  box-shadow: 0 6px 0 var(--ha-navy);
+  color: var(--ha-red);
+}
+
+.letter-tile-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--ha-navy);
+}
+
+.letter-tile-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.scramble-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Game 2: Word Match
+   ========================================================================== */
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+
+@media (min-width: 600px) {
+  .match-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+  }
+}
+
+.match-card {
+  perspective: 1000px;
+  height: 120px;
+  cursor: pointer;
+}
+
+.match-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  border-radius: var(--radius-lg);
+}
+
+.match-card.flipped .match-card-inner,
+.match-card.matched .match-card-inner {
+  transform: rotateY(180deg);
+}
+
+.match-card-front, .match-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 2px solid var(--ha-border);
+  box-shadow: var(--ha-shadow-xs);
+}
+
+.match-card-front {
+  background: linear-gradient(135deg, var(--ha-navy) 0%, var(--ha-navy-light) 100%);
+  color: #FFFFFF;
+}
+
+.match-card-front .card-logo-mini {
+  font-size: 2.2rem;
+  opacity: 0.9;
+}
+
+.match-card-back {
+  background: #FFFFFF;
+  transform: rotateY(180deg);
+  border-color: var(--ha-navy);
+}
+
+.match-card.matched .match-card-back {
+  background: var(--ha-success-bg);
+  border-color: var(--ha-success);
+  color: var(--ha-success);
+}
+
+.match-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.match-emoji {
+  font-size: 2.4rem;
+}
+
+.match-word {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ha-navy);
+  letter-spacing: 0.02em;
+}
+
+/* ==========================================================================
+   Game 3: Picture Quiz
+   ========================================================================== */
+.pic-quiz-wrapper {
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--ha-border);
+  box-shadow: var(--ha-shadow-md);
+  padding: 36px 28px;
+  text-align: center;
+}
+
+.pic-quiz-display {
+  background: var(--ha-navy-subtle);
+  border-radius: var(--radius-lg);
+  padding: 36px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #CBD5E1;
+}
+
+.pic-quiz-emoji {
+  font-size: 5rem;
+  line-height: 1;
+  margin-bottom: 12px;
+  animation: logoFloat 2.5s ease-in-out infinite;
+}
+
+.pic-quiz-prompt {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--ha-navy);
+  margin-bottom: 8px;
+}
+
+.pic-quiz-hint {
+  font-size: 0.9rem;
+  color: var(--ha-text-muted);
+}
+
+.pic-quiz-options-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@media (min-width: 600px) {
+  .pic-quiz-options-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+.quiz-option-btn {
+  background: #FFFFFF;
+  border: 2px solid var(--ha-border);
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ha-navy);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.quiz-option-btn:hover:not(:disabled) {
+  border-color: var(--ha-navy);
+  background: var(--ha-navy-subtle);
+  transform: translateY(-2px);
+}
+
+.quiz-option-btn.correct {
+  background: var(--ha-success-bg) !important;
+  border-color: var(--ha-success) !important;
+  color: #065F46 !important;
+}
+
+.quiz-option-btn.wrong {
+  background: var(--ha-red-light) !important;
+  border-color: var(--ha-red) !important;
+  color: var(--ha-red-dark) !important;
+}
+
+/* ==========================================================================
+   Game 4: Sentence Builder
+   ========================================================================== */
+.sb-target-zone {
+  min-height: 90px;
+  background: var(--ha-navy-subtle);
+  border: 2px dashed #93C5FD;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.word-chip {
+  background: #FFFFFF;
+  border: 2px solid var(--ha-navy);
+  color: var(--ha-navy);
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(10, 37, 88, 0.1);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.word-chip:hover {
+  transform: scale(1.05);
+  background: var(--ha-red);
+  border-color: var(--ha-red);
+  color: #FFFFFF;
+}
+
+.word-chip-bank {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+/* ==========================================================================
+   Game 5: Speed Round
+   ========================================================================== */
+.speed-timer-bar {
+  width: 100%;
+  height: 12px;
+  background: #E2E8F0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.speed-timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ha-success), var(--ha-gold), var(--ha-red));
+  width: 100%;
+  transition: width 1s linear;
+}
+
+.speed-question-box {
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--ha-border);
+  box-shadow: var(--ha-shadow-lg);
+  padding: 36px 24px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Game 6: True or False
+   ========================================================================== */
+.tf-statement-card {
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--ha-border);
+  box-shadow: var(--ha-shadow-md);
+  padding: 40px 24px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.tf-statement-text {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ha-navy);
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+.tf-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.btn-tf {
+  padding: 20px 24px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  border-radius: var(--radius-lg);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-tf-true {
+  background: #10B981;
+  color: #FFFFFF;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.3);
+}
+
+.btn-tf-true:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+.btn-tf-false {
+  background: var(--ha-red);
+  color: #FFFFFF;
+  box-shadow: 0 6px 18px rgba(200, 16, 46, 0.3);
+}
+
+.btn-tf-false:hover {
+  background: var(--ha-red-dark);
+  transform: translateY(-2px);
+}
+
+/* Feedback toast bar */
+.quiz-feedback-banner {
+  margin-top: 20px;
+  padding: 14px 20px;
+  border-radius: var(--radius-md);
+  font-size: 1.05rem;
+  font-weight: 700;
+  animation: popIn 0.25s ease-out;
+}
+
+.quiz-feedback-banner.correct {
+  background: var(--ha-success-bg);
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.quiz-feedback-banner.wrong {
+  background: var(--ha-red-light);
+  color: var(--ha-red-dark);
+  border: 1px solid #FECDD3;
+}
+
+/* Speaking Microphone Wave */
+.mic-action-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin: 28px 0;
+}
+
+.mic-circle-btn {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-pill);
+  background: var(--ha-red);
+  color: #FFFFFF;
+  border: none;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(200, 16, 46, 0.35);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.mic-circle-btn:hover {
+  transform: scale(1.08);
+  background: var(--ha-red-dark);
+}
+
+.mic-circle-btn.listening {
+  animation: pulseGlow 1.5s infinite;
+  background: #EF4444;
+}
+
+/* Mobile Responsive Game Layouts */
+@media (max-width: 600px) {
+  .game-zone-container {
+    padding: 10px 0 20px;
+  }
+  .game-header-bar {
+    margin-bottom: 16px;
+    gap: 10px;
+  }
+  .score-chip {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+  .tf-statement-card {
+    padding: 24px 14px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+  }
+  .tf-statement-text {
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+  .tf-buttons-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .btn-tf {
+    padding: 14px 18px;
+    font-size: 1.15rem;
+  }
+  .pic-quiz-wrapper {
+    padding: 20px 14px;
+    border-radius: var(--radius-lg);
+  }
+  .pic-quiz-display {
+    padding: 24px 14px;
+    margin-bottom: 16px;
+  }
+  .pic-quiz-emoji {
+    font-size: 3.6rem;
+  }
+  .pic-quiz-prompt {
+    font-size: 1.15rem;
+  }
+  .quiz-option-btn {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+  .speed-question-box {
+    padding: 22px 14px;
+    border-radius: var(--radius-lg);
+  }
+  .sb-target-zone {
+    min-height: 70px;
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  .word-chip {
+    font-size: 0.88rem;
+    padding: 8px 14px;
+  }
+  .word-chip-bank {
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .mic-circle-btn {
+    width: 64px;
+    height: 64px;
+    font-size: 1.6rem;
+  }
+}

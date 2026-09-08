@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A2558" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>HOME ACADEMY — English Language Program</title>
+  <meta name="description" content="Official digital companion for Home Academy English Language Program students. Master the 6 class topics, take quizzes, play games, and track real progress." />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Core Stylesheets -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/games.css" />
+</head>
+<body>
+
+  <!-- Branded Loading Screen with Official Logo -->
+  <div id="ha-loading-screen">
+    <div class="loading-logo-box">
+      <img src="assets/logo.png" alt="Home Academy English Language Program" />
+    </div>
+    <div class="loading-spinner-bar"></div>
+    <div class="loading-text">Loading Home Academy…</div>
+    <div class="loading-subtext">“Learn English. Play. Improve.”</div>
+  </div>
+
+    <!-- Top Gradient Accent Line -->
+    <div class="navbar-top-accent"></div>
+
+    <!-- Main Top Navigation -->
+    <header class="ha-navbar">
+      <div class="container navbar-inner">
+        <!-- Brand Link with Official Logo - No Awkward Duplicate Text -->
+        <div class="brand-link" id="nav-brand-link" title="Home Academy - English Language Program">
+          <img src="assets/logo.png" alt="Home Academy - English Language Program" class="brand-logo-img" />
+        </div>
+
+        <!-- Desktop Navigation Items -->
+        <nav class="nav-links-desktop">
+          <a class="nav-item active" data-route="home">Home</a>
+          <a class="nav-item" data-route="dashboard">Dashboard</a>
+          <a class="nav-item" data-route="topics">Topics</a>
+          <a class="nav-item" data-route="roleplays">Roleplays <span class="nav-micro-badge gold">CLASS</span></a>
+          <a class="nav-item" data-route="activities">Activities <span class="nav-micro-badge gold">NEW</span></a>
+          <a class="nav-item" data-route="full-test">Full Test <span class="nav-micro-badge red">EXAM</span></a>
+          <a class="nav-item" data-route="leaderboard">Leaderboard</a>
+          <a class="nav-item" data-route="admin">Teacher Portal</a>
+        </nav>
+
+        <!-- Navbar Actions: Sound Toggle + User Pill / Join Class -->
+        <div class="navbar-actions">
+          <button class="audio-toggle-btn" id="nav-sound-btn" title="Toggle Sound Effects">
+            <span class="ha-nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg></span> <span class="sound-text">Sound On</span>
+          </button>
+          
+          <div class="user-nav-pill" id="nav-user-pill" style="display: none;" title="Click to switch student profile">
+            <!-- Populated dynamically via stateManager -->
+          </div>
+
+          <div id="nav-auth-buttons" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-outline btn-sm" id="nav-login-btn">
+              <span class="ha-nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg></span> <span class="auth-btn-text">Log In</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="nav-join-btn">
+              <span class="ha-nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path></svg></span> <span class="auth-btn-text">Join Class</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dynamic View Container -->
+    <main class="main-content" id="view-container">
+      <!-- SPA views injected dynamically here -->
+    </main>
+
+    <!-- Academy Official Footer -->
+    <footer style="background: #FFFFFF; border-top: 1px solid var(--ha-border); padding: 36px 0 28px;">
+      <div class="container" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;">
+        <img src="assets/logo.png" alt="Home Academy - English Language Program" style="height: 52px; width: auto; object-fit: contain;" />
+        <p style="font-size: 0.88rem; color: var(--ha-text-muted); max-width: 520px; line-height: 1.5;">
+          “Learn English. Play. Improve.” — Official digital companion for Home Academy English Language Program students.
+        </p>
+        <div style="display: flex; gap: 16px; font-size: 0.82rem; font-weight: 600; color: var(--ha-navy); flex-wrap: wrap; justify-content: center;">
+          <span>Class Teacher: <strong>Sir Zubair</strong></span>
+          <span>•</span>
+          <a href="#join" onclick="window.dispatchEvent(new CustomEvent('ha:open-join-modal'))">Class Code: HOME-ENGLISH</a>
+          <span>•</span>
+          <a href="#topics" onclick="window.dispatchEvent(new CustomEvent('ha:navigate', {detail: 'topics'}))">6 Class Topics</a>
+          <span>•</span>
+          <a href="#roleplays" onclick="window.dispatchEvent(new CustomEvent('ha:navigate', {detail: 'roleplays'}))">Roleplays</a>
+          <span>•</span>
+          <a href="#activities" onclick="window.dispatchEvent(new CustomEvent('ha:navigate', {detail: 'activities'}))">Activities</a>
+          <span>•</span>
+          <a href="#full-test" onclick="window.dispatchEvent(new CustomEvent('ha:navigate', {detail: 'full-test'}))">Full Grammar Test</a>
+          <span>•</span>
+          <a href="#admin" onclick="window.dispatchEvent(new CustomEvent('ha:navigate', {detail: 'admin'}))">Teacher Portal</a>
+        </div>
+        <div style="font-size: 0.76rem; color: var(--ha-text-light); margin-top: 6px;">
+          &copy; Home Academy English Language Program. All rights reserved.
+        </div>
+      </div>
+    </footer>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+      <div class="mobile-nav-item active" data-route="home">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+        <span>Home</span>
+      </div>
+      <div class="mobile-nav-item" data-route="dashboard">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg></span>
+        <span>Dashboard</span>
+      </div>
+      <div class="mobile-nav-item" data-route="topics">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>
+        <span>Topics</span>
+      </div>
+      <div class="mobile-nav-item" data-route="roleplays">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+        <span>Roleplays</span>
+      </div>
+      <div class="mobile-nav-item" data-route="activities">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c0-1.57.8-2.31.8-2.31a2 2 0 0 0-1.979-2.54H15v1a2 2 0 1 1-4 0V3H7.74a2 2 0 0 0-1.98 2.54s.8.74.8 2.31c0 1.48-1.06 2.15-1.06 2.15a2 2 0 0 0-1.5 1.94v3.06a2 2 0 0 0 1.5 1.94s1.06.67 1.06 2.15c0 1.57-.8 2.31-.8 2.31a2 2 0 0 0 1.98 2.54H11v-1a2 2 0 1 1 4 0v1h3.26a2 2 0 0 0 1.98-2.54s-.8-.74-.8-2.31c0-1.48 1.06-2.15 1.06-2.15a2 2 0 0 0 1.5-1.94v-3.06a2 2 0 0 0-1.5-1.94s-1.06-.67-1.06-2.15z"></path></svg></span>
+        <span>Activities</span>
+      </div>
+      <div class="mobile-nav-item" data-route="full-test">
+        <span class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg></span>
+        <span>Full Test</span>
+      </div>
+    </nav>
+
+    <!-- Modals Mounts -->
+    <div id="auth-modal-container"></div>
+    <div id="celebration-modal-mount"></div>
+  </div>
+
+  <!-- Universal Script: Works seamlessly on http://localhost:3000 AND direct file:/// double-click -->
+  <script src="js/bundle.js" defer></script>
+  <script>
+    // Failsafe loader dismissal: ensures loading screen never hangs on any browser or file:// protocol
+    setTimeout(function() {
+      var loader = document.getElementById('ha-loading-screen');
+      if (loader && loader.style.display !== 'none') {
+        loader.classList.add('fade-out');
+        setTimeout(function() { loader.style.display = 'none'; }, 400);
+      }
+    }, 2500);
+  </script>
+</body>
+</html>

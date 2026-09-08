@@ -1,0 +1,16 @@
+{
+  "name": "home-academy",
+  "version": "1.0.0",
+  "description": "Home Academy - English Language Program",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node scripts/build.js",
+    "test": "node test_database_full.js && node test_api_server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "bcryptjs": "^3.0.3",
+    "esbuild": "^0.25.0"
+  }
+}
