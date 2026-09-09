@@ -5,24 +5,26 @@ import * as db from './data/db.js';
 async function runTests() {
   console.log('--- STARTING DATABASE TEST SUITE ---');
 
+  await db.initDatabase();
+
   // 1. Class settings verification
-  const settings = db.getClassSettings();
+  const settings = await db.getClassSettings();
   console.log('✓ Class Settings:', settings);
   assert.strictEqual(settings.code, 'HOME-ENGLISH');
   assert.strictEqual(settings.teacher, 'Sir Zubair');
 
   // 2. Teacher password verification
-  assert.strictEqual(db.verifyTeacherPassword('pakistan786'), true);
-  assert.strictEqual(db.verifyTeacherPassword('wrongpassword'), false);
+  assert.strictEqual(await db.verifyTeacherPassword('pakistan786'), true);
+  assert.strictEqual(await db.verifyTeacherPassword('wrongpassword'), false);
   console.log('✓ Teacher password authentication verified (pakistan786)');
 
   // 3. Curriculum and Roleplays seeded correctly
-  const topics = db.getCurriculumTopics(true);
+  const topics = await db.getCurriculumTopics(true);
   console.log(`✓ Curriculum topics count: ${topics.length}`);
   assert.strictEqual(topics.length, 6);
   assert.strictEqual(topics[0].id, 'adjectives');
 
-  const roleplays = db.getRoleplays(true);
+  const roleplays = await db.getRoleplays(true);
   console.log(`✓ Roleplay presentations count: ${roleplays.length}`);
   assert.strictEqual(roleplays.length, 5);
   assert.strictEqual(roleplays[0].id, 'rp_01');
@@ -32,7 +34,7 @@ async function runTests() {
   const salt = db.generateSaltServer(16);
   const hash = db.hashPasswordServer('studentpass123', salt);
 
-  const student = db.createStudent({
+  const student = await db.createStudent({
     name: 'Hamza Zubair',
     email: testEmail,
     passwordHash: hash,
@@ -48,15 +50,15 @@ async function runTests() {
   assert.ok(student.unlockedAchievements.includes('first_join'));
 
   // Verify credentials
-  const verified = db.verifyStudentCredentials(testEmail, 'studentpass123');
+  const verified = await db.verifyStudentCredentials(testEmail, 'studentpass123');
   assert.ok(verified, 'Credentials should verify');
   assert.strictEqual(verified.id, student.id);
 
-  const invalid = db.verifyStudentCredentials(testEmail, 'wrongpass');
+  const invalid = await db.verifyStudentCredentials(testEmail, 'wrongpass');
   assert.strictEqual(invalid, null, 'Wrong password must fail');
 
   // 5. Server-Side XP Award & Anti-Replay Idempotency
-  const xpRes1 = db.awardXP({
+  const xpRes1 = await db.awardXP({
     studentId: student.id,
     amount: 50,
     source: 'test_task',
@@ -66,7 +68,7 @@ async function runTests() {
   assert.strictEqual(xpRes1.newXP, 50);
 
   // Attempt duplicate with same idempotency key
-  const xpResDup = db.awardXP({
+  const xpResDup = await db.awardXP({
     studentId: student.id,
     amount: 50,
     source: 'test_task',
@@ -77,11 +79,11 @@ async function runTests() {
   assert.strictEqual(xpResDup.xpAwarded, 0);
 
   // 6. Topic Progress
-  const learnRes = db.recordTopicLearn(student.id, 'adjectives');
+  const learnRes = await db.recordTopicLearn(student.id, 'adjectives');
   console.log('✓ Topic Learn XP Awarded:', learnRes.xpAwarded);
   assert.strictEqual(learnRes.xpAwarded, 10);
 
-  const quizRes = db.recordTopicQuiz({
+  const quizRes = await db.recordTopicQuiz({
     studentId: student.id,
     topicId: 'adjectives',
     submissionToken: `tok_quiz_${Date.now()}`,
@@ -94,7 +96,7 @@ async function runTests() {
   assert.strictEqual(quizRes.xpEarned, 50);
 
   // 7. Roleplay Presentation Progress
-  const rpRes = db.recordRoleplayCompletion({
+  const rpRes = await db.recordRoleplayCompletion({
     studentId: student.id,
     roleplayId: 'rp_01',
     percent: 100
@@ -104,7 +106,7 @@ async function runTests() {
   assert.strictEqual(rpRes.xpEarned, 50);
 
   // 8. Full Grammar Test
-  const ftRes = db.recordFullGrammarTest({
+  const ftRes = await db.recordFullGrammarTest({
     studentId: student.id,
     submissionToken: `tok_ft_${Date.now()}`,
     score: 28,
@@ -117,15 +119,15 @@ async function runTests() {
   assert.strictEqual(ftRes.xpEarned, 125);
 
   // 9. Leaderboard returns real student
-  const leaderboard = db.getLeaderboard(10);
+  const leaderboard = await db.getLeaderboard(10);
   console.log('✓ Leaderboard entries:', leaderboard.length);
   const found = leaderboard.find(s => s.id === student.id);
   assert.ok(found, 'Student should be present on real database leaderboard');
   console.log('✓ Student on leaderboard with rank:', found.rank, 'XP:', found.xp);
 
   // 10. Clean up test student
-  db.deleteStudentById(student.id);
-  const deleted = db.getStudentById(student.id);
+  await db.deleteStudentById(student.id);
+  const deleted = await db.getStudentById(student.id);
   assert.strictEqual(deleted, null, 'Deleted student must not exist');
   console.log('✓ Test student cleaned up successfully');
 

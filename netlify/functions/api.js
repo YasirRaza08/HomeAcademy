@@ -1,17 +1,47 @@
 // Netlify Serverless Function Handler for Home Academy
-// Delegates /api/* requests to server/apiRouter.js with full REST API and database capabilities
+// Connects to Turso Cloud Database, executes self-healing migration on cold start,
+// and delegates /api/* requests to server/apiRouter.js with full REST API and SSE support.
 
 import { handleApiRequest } from '../../server/apiRouter.js';
+import { initDatabase } from '../../data/db.js';
+
+// Self-healing schema initialization on serverless function cold start
+let initPromise = null;
+function ensureDatabaseInitialized() {
+  if (!initPromise) {
+    initPromise = initDatabase()
+      .then(() => {
+        console.log('[Home Academy] Production database schema verified on cold start.');
+      })
+      .catch(err => {
+        console.error('[Home Academy] Database initialization error on cold start:', err);
+        initPromise = null; // Reset to allow retry on next request
+        throw err;
+      });
+  }
+  return initPromise;
+}
 
 /**
- * Adapter that converts Node.js handleApiRequest to Netlify standard Response
+ * Netlify Function Handler (Modern Web Standard Request/Response)
  */
 export default async function handler(request, context) {
+  try {
+    await ensureDatabaseInitialized();
+  } catch (initErr) {
+    return new Response(JSON.stringify({
+      error: 'Database connection or initialization failed: ' + initErr.message,
+      success: false
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   // Extract URL, method, headers
   const url = new URL(request.url);
   const method = request.method;
   
-  // Read body if method has body
   let bodyBuffer = '';
   if (method !== 'GET' && method !== 'HEAD') {
     try {
@@ -19,7 +49,6 @@ export default async function handler(request, context) {
     } catch (e) {}
   }
 
-  // Create mock IncomingMessage
   const headers = {};
   for (const [k, v] of request.headers.entries()) {
     headers[k.toLowerCase()] = v;
@@ -30,17 +59,16 @@ export default async function handler(request, context) {
     method,
     headers,
     body: bodyBuffer,
-    on(event, handler) {
+    on(event, fn) {
       if (event === 'data' && bodyBuffer) {
-        handler(Buffer.from(bodyBuffer));
+        fn(Buffer.from(bodyBuffer));
       } else if (event === 'end') {
-        handler();
+        fn();
       }
       return this;
     }
   };
 
-  // Create mock ServerResponse that resolves with a web Response
   return new Promise((resolve) => {
     let statusCode = 200;
     const responseHeaders = {};
@@ -79,8 +107,20 @@ export default async function handler(request, context) {
   });
 }
 
-// AWS Lambda / Netlify legacy event-based compatibility
+/**
+ * AWS Lambda / Netlify legacy event-based compatibility handler
+ */
 export const handlerLegacy = async (event, context) => {
+  try {
+    await ensureDatabaseInitialized();
+  } catch (initErr) {
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Database initialization failed: ' + initErr.message, success: false })
+    };
+  }
+
   const url = new URL(event.rawUrl || `http://localhost${event.path}`);
   const req = {
     url: url.pathname + url.search,

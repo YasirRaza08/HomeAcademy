@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { handleApiRequest } from './server/apiRouter.js';
+import { initDatabase } from './data/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +27,7 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer(async (req, res) => {
-  // Delegate API routes to persistent SQLite backend router
+  // Delegate API routes to persistent backend router
   if (req.url.startsWith('/api/') || req.url === '/api') {
     try {
       await handleApiRequest(req, res);
@@ -68,9 +69,19 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`=========================================`);
-  console.log(`  HOME ACADEMY — English Language Program`);
-  console.log(`  Server running at http://localhost:${PORT}/`);
-  console.log(`=========================================`);
-});
+async function startServer() {
+  try {
+    await initDatabase();
+  } catch (dbErr) {
+    console.warn('[Database Warning]:', dbErr.message);
+  }
+
+  server.listen(PORT, () => {
+    console.log(`=========================================`);
+    console.log(`  HOME ACADEMY — English Language Program`);
+    console.log(`  Server running at http://localhost:${PORT}/`);
+    console.log(`=========================================`);
+  });
+}
+
+startServer();

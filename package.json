@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build.js",
-    "test": "node test_database_full.js && node test_api_server.js"
+    "db:migrate": "node scripts/setup-hosted-db.js",
+    "test": "node test_database_full.js && node test_production_db_and_api.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
