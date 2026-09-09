@@ -51,13 +51,70 @@ function parseJsonBody(req) {
   });
 }
 
-function sendJson(res, statusCode, data) {
-  res.writeHead(statusCode, {
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie || req.headers.Cookie;
+  if (!rc) return list;
+  rc.split(';').forEach(cookie => {
+    const parts = cookie.split('=');
+    const name = parts.shift().trim();
+    if (name) {
+      list[name] = decodeURIComponent(parts.join('='));
+    }
+  });
+  return list;
+}
+
+function buildCookieHeader(name, value, options = {}) {
+  const {
+    path = '/',
+    maxAge,
+    httpOnly = true,
+    sameSite = 'Lax',
+    secure = false
+  } = options;
+
+  let cookie = `${name}=${encodeURIComponent(value)}; Path=${path}; SameSite=${sameSite}`;
+  if (httpOnly) cookie += '; HttpOnly';
+  if (secure) cookie += '; Secure';
+  if (maxAge !== undefined) cookie += `; Max-Age=${maxAge}`;
+  return cookie;
+}
+
+function getCorsHeaders(req) {
+  const origin = req.headers.origin || req.headers.Origin || '*';
+  const isSpecificOrigin = origin !== '*';
+  return {
+    'Content-Type': 'application/json; charset=UTF-8',
+    'Access-Control-Allow-Origin': isSpecificOrigin ? origin : '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Credentials': 'true'
+  };
+}
+
+function sendJson(res, statusCode, data, extraHeaders = {}) {
+  const headers = {
     'Content-Type': 'application/json; charset=UTF-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
-  });
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    ...extraHeaders
+  };
+  res.writeHead(statusCode, headers);
+  res.end(JSON.stringify(data));
+}
+
+function sendJsonWithCookie(req, res, statusCode, data, cookies = []) {
+  const corsHeaders = getCorsHeaders(req);
+  const cookieHeaders = Array.isArray(cookies) ? cookies : [cookies];
+  const headers = {
+    ...corsHeaders
+  };
+  if (cookieHeaders.length > 0) {
+    headers['Set-Cookie'] = cookieHeaders.length === 1 ? cookieHeaders[0] : cookieHeaders;
+  }
+  res.writeHead(statusCode, headers);
   res.end(JSON.stringify(data));
 }
 
@@ -65,16 +122,58 @@ function sendError(res, statusCode, message, extra = {}) {
   sendJson(res, statusCode, { error: message, success: false, ...extra });
 }
 
-function getBearerToken(req, url) {
+// In-Memory Sliding Window Rate Limiter (Brute-force protection)
+const rateLimitMap = new Map();
+
+function checkRateLimit(key, maxAttempts = 5, windowMs = 5 * 60 * 1000) {
+  const now = Date.now();
+  const record = rateLimitMap.get(key);
+  if (!record || now > record.resetTime) {
+    return { allowed: true, remaining: maxAttempts };
+  }
+  if (record.count >= maxAttempts) {
+    const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  return { allowed: true, remaining: maxAttempts - record.count };
+}
+
+function recordFailedAttempt(key, maxAttempts = 5, windowMs = 5 * 60 * 1000) {
+  const now = Date.now();
+  const record = rateLimitMap.get(key);
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs });
+  } else {
+    record.count += 1;
+  }
+}
+
+function resetRateLimit(key) {
+  rateLimitMap.delete(key);
+}
+
+function getAuthToken(req, url) {
+  // 1. Authorization: Bearer <token>
   const authHeader = req.headers['authorization'] || req.headers['Authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7).trim();
   }
+
+  // 2. HTTP-Only Cookie: ha_admin_session or ha_session
+  const cookies = parseCookies(req);
+  if (cookies.ha_admin_session) {
+    return cookies.ha_admin_session;
+  }
+  if (cookies.ha_session) {
+    return cookies.ha_session;
+  }
+
+  // 3. Query string fallback: ?token=...
   return url.searchParams.get('token') || null;
 }
 
 async function requireStudentAuth(req, url) {
-  const token = getBearerToken(req, url);
+  const token = getAuthToken(req, url);
   if (!token) return null;
   const session = await db.getSession(token);
   if (!session || !session.student_id) return null;
@@ -84,11 +183,21 @@ async function requireStudentAuth(req, url) {
 }
 
 async function requireAdminAuth(req, url) {
-  const token = getBearerToken(req, url);
-  if (!token) return null;
+  const token = getAuthToken(req, url);
+  if (!token) {
+    return { status: 'unauthenticated', session: null, token: null };
+  }
   const session = await db.getSession(token);
-  if (!session || (session.role !== 'teacher' && session.role !== 'admin')) return null;
-  return { session, token };
+  if (!session) {
+    return { status: 'unauthenticated', session: null, token: null };
+  }
+  if (session.role === 'student') {
+    return { status: 'forbidden', session, token };
+  }
+  if (session.role !== 'teacher' && session.role !== 'admin') {
+    return { status: 'forbidden', session, token };
+  }
+  return { status: 'authorized', session, token };
 }
 
 /**
@@ -213,19 +322,53 @@ export async function handleApiRequest(req, res) {
   if (pathname === '/api/auth/login' && method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      if (body.role === 'teacher' || (!body.email && body.password)) {
-        const valid = await db.verifyTeacherPassword(body.password);
-        if (!valid) return sendError(res, 401, 'Incorrect teacher password. Please try again.');
-        const userRes = await db.client.execute(`SELECT user_id FROM users WHERE role = 'teacher' LIMIT 1`);
-        const user = userRes.rows[0];
-        const token = await db.createSession(user.user_id, null, 'teacher', 24);
+      if (body.role === 'teacher' || (!body.email && body.password) || body.emailOrUsername || body.username) {
+        const identifier = body.emailOrUsername || body.username || body.email || body.identifier;
+        const password = body.password;
+        const rememberMe = Boolean(body.rememberMe);
+
+        if (!password) return sendError(res, 400, 'Teacher password is required');
+
+        const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '127.0.0.1';
+        const rateLimitKey = `admin_login:${clientIp}:${(identifier || 'teacher').toLowerCase()}`;
+        const rateCheck = checkRateLimit(rateLimitKey, 5, 5 * 60 * 1000);
+        if (!rateCheck.allowed) {
+          return sendError(res, 429, 'Too many failed login attempts. Please wait 5 minutes and try again.', {
+            retryAfter: rateCheck.retryAfter
+          });
+        }
+
+        const teacherUser = await db.verifyTeacherCredentials(identifier, password);
+        if (!teacherUser) {
+          recordFailedAttempt(rateLimitKey, 5, 5 * 60 * 1000);
+          return sendError(res, 401, 'Incorrect password. Please try again.');
+        }
+
+        resetRateLimit(rateLimitKey);
+        const sessionInfo = await db.createTeacherSession(teacherUser.userId, rememberMe);
         const settings = await db.getClassSettings();
-        return sendJson(res, 200, {
-          success: true,
-          token,
-          role: 'teacher',
-          teacher: { name: settings.teacher, code: settings.code }
+
+        const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+        const cookieHeader = buildCookieHeader('ha_admin_session', sessionInfo.token, {
+          maxAge: sessionInfo.maxAgeSeconds,
+          secure: isSecure,
+          httpOnly: true,
+          sameSite: 'Lax',
+          path: '/'
         });
+
+        return sendJsonWithCookie(req, res, 200, {
+          success: true,
+          token: sessionInfo.token,
+          role: 'teacher',
+          user: {
+            id: teacherUser.userId,
+            name: teacherUser.name,
+            email: teacherUser.email,
+            role: 'teacher'
+          },
+          teacher: { name: settings.teacher || teacherUser.name, code: settings.code }
+        }, cookieHeader);
       }
 
       const { email, password } = body;
@@ -237,22 +380,84 @@ export async function handleApiRequest(req, res) {
       }
 
       const token = await db.createSession(student.userId, student.studentId, 'student');
-      return sendJson(res, 200, { success: true, token, student });
+      const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+      const studentCookie = buildCookieHeader('ha_session', token, {
+        maxAge: 72 * 3600,
+        secure: isSecure,
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/'
+      });
+
+      return sendJsonWithCookie(req, res, 200, { success: true, token, student }, studentCookie);
     } catch (err) {
+      console.error('[Login Error]:', err);
       return sendError(res, 500, 'Something went wrong. Please try again.');
     }
   }
 
-  if (pathname === '/api/auth/logout' && method === 'POST') {
-    const token = getBearerToken(req, url);
+  if ((pathname === '/api/auth/logout' || pathname === '/api/admin/logout') && method === 'POST') {
+    const token = getAuthToken(req, url);
     if (token) await db.deleteSession(token);
-    return sendJson(res, 200, { success: true, message: 'Logged out successfully' });
+    const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+    const clearAdminCookie = buildCookieHeader('ha_admin_session', '', { maxAge: 0, path: '/', secure: isSecure, httpOnly: true });
+    const clearStudentCookie = buildCookieHeader('ha_session', '', { maxAge: 0, path: '/', secure: isSecure, httpOnly: true });
+    return sendJsonWithCookie(req, res, 200, { success: true, message: 'Logged out successfully' }, [clearAdminCookie, clearStudentCookie]);
   }
 
   // ------------------------------------------------------------------------
-  // 4. STUDENT PRIVATE DATA ACCESS (STRICT PRIVACY)
+  // 4. AUTH & USER PROFILE AUTO-RESTORATION (GET /api/auth/me)
   // ------------------------------------------------------------------------
-  if ((pathname === '/api/student/me' || pathname === '/api/auth/me' || pathname === '/api/student/dashboard') && method === 'GET') {
+  if (pathname === '/api/auth/me' && method === 'GET') {
+    const token = getAuthToken(req, url);
+    if (!token) {
+      return sendError(res, 401, 'Your session has expired. Please log in again.', { authenticated: false });
+    }
+
+    const session = await db.getSession(token);
+    if (!session) {
+      return sendError(res, 401, 'Your session has expired. Please log in again.', { authenticated: false });
+    }
+
+    if (session.role === 'teacher' || session.role === 'admin') {
+      const settings = await db.getClassSettings();
+      return sendJson(res, 200, {
+        success: true,
+        authenticated: true,
+        role: 'teacher',
+        user: {
+          id: session.user_id,
+          name: settings.teacher || 'Sir Zubair',
+          role: 'teacher',
+          email: 'teacher@homeacademy.com'
+        }
+      });
+    }
+
+    if (session.role === 'student' && session.student_id) {
+      const student = await db.getStudentById(session.student_id);
+      if (!student) {
+        return sendError(res, 401, 'Student profile not found', { authenticated: false });
+      }
+      return sendJson(res, 200, {
+        success: true,
+        authenticated: true,
+        role: 'student',
+        student,
+        user: {
+          id: student.userId || student.id,
+          name: student.name,
+          role: 'student',
+          avatar: student.avatar
+        }
+      });
+    }
+
+    return sendError(res, 401, 'Invalid session', { authenticated: false });
+  }
+
+  // Student Private Dashboard Data (GET /api/student/me or /api/student/dashboard)
+  if ((pathname === '/api/student/me' || pathname === '/api/student/dashboard') && method === 'GET') {
     const auth = await requireStudentAuth(req, url);
     if (!auth) return sendError(res, 401, 'Unauthorized: Invalid or expired student session');
     const [topics, roleplays] = await Promise.all([
@@ -475,30 +680,87 @@ export async function handleApiRequest(req, res) {
   }
 
   // ------------------------------------------------------------------------
-  // 9. TEACHER / ADMIN DASHBOARD & MANAGEMENT
+  // 9. TEACHER / ADMIN DASHBOARD & MANAGEMENT (SERVER-SIDE PROTECTED)
   // ------------------------------------------------------------------------
+  if (pathname.startsWith('/api/admin/') && pathname !== '/api/admin/login') {
+    const adminAuth = await requireAdminAuth(req, url);
+    if (adminAuth.status === 'unauthenticated') {
+      return sendError(res, 401, "You don't have permission to access this area.", { code: 'UNAUTHORIZED' });
+    }
+    if (adminAuth.status === 'forbidden') {
+      return sendError(res, 403, 'Access denied. Teacher privileges required.', { code: 'FORBIDDEN' });
+    }
+    req.adminAuth = adminAuth;
+  }
+
   if (pathname === '/api/admin/login' && method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const { password } = body;
-      if (!password) return sendError(res, 400, 'Admin password is required');
+      const identifier = body.emailOrUsername || body.username || body.email || body.identifier;
+      const password = body.password;
+      const rememberMe = Boolean(body.rememberMe);
 
-      const valid = await db.verifyTeacherPassword(password);
-      if (!valid) return sendError(res, 401, 'Incorrect teacher password. Please try again.');
+      if (!password) return sendError(res, 400, 'Teacher password is required');
 
-      const userRes = await db.client.execute(`SELECT user_id FROM users WHERE role = 'teacher' LIMIT 1`);
-      const user = userRes.rows[0];
-      const token = await db.createSession(user.user_id, null, 'teacher', 24);
-      return sendJson(res, 200, { success: true, token, role: 'teacher' });
+      // Rate limit check: max 5 failed attempts per 5 minutes per IP + identifier
+      const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '127.0.0.1';
+      const rateLimitKey = `admin_login:${clientIp}:${(identifier || 'teacher').toLowerCase()}`;
+      const rateCheck = checkRateLimit(rateLimitKey, 5, 5 * 60 * 1000);
+      if (!rateCheck.allowed) {
+        return sendError(res, 429, 'Too many failed login attempts. Please wait 5 minutes and try again.', {
+          retryAfter: rateCheck.retryAfter
+        });
+      }
+
+      const teacherUser = await db.verifyTeacherCredentials(identifier, password);
+      if (!teacherUser) {
+        recordFailedAttempt(rateLimitKey, 5, 5 * 60 * 1000);
+        return sendError(res, 401, 'Incorrect password. Please try again.');
+      }
+
+      resetRateLimit(rateLimitKey);
+      const sessionInfo = await db.createTeacherSession(teacherUser.userId, rememberMe);
+      const settings = await db.getClassSettings();
+
+      const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+      const cookieHeader = buildCookieHeader('ha_admin_session', sessionInfo.token, {
+        maxAge: sessionInfo.maxAgeSeconds,
+        secure: isSecure,
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/'
+      });
+
+      return sendJsonWithCookie(req, res, 200, {
+        success: true,
+        token: sessionInfo.token,
+        role: 'teacher',
+        user: {
+          id: teacherUser.userId,
+          name: teacherUser.name,
+          email: teacherUser.email,
+          role: 'teacher'
+        },
+        teacher: { name: settings.teacher || teacherUser.name, code: settings.code }
+      }, cookieHeader);
     } catch (err) {
+      console.error('[Admin Login Error]:', err);
       return sendError(res, 500, 'Internal Server Error');
     }
   }
 
   if (pathname === '/api/admin/me' && method === 'GET') {
-    const admin = await requireAdminAuth(req, url);
-    if (!admin) return sendError(res, 401, 'Unauthorized');
-    return sendJson(res, 200, { success: true, authenticated: true });
+    const settings = await db.getClassSettings();
+    return sendJson(res, 200, {
+      success: true,
+      authenticated: true,
+      user: {
+        id: req.adminAuth.session.user_id,
+        name: settings.teacher || 'Sir Zubair',
+        role: 'teacher',
+        email: 'teacher@homeacademy.com'
+      }
+    });
   }
 
   // Admin: Overview Stats (GET /api/admin/overview)
@@ -765,27 +1027,77 @@ export async function handleApiRequest(req, res) {
     }
   }
 
-  // Admin: Change Password
-  if (pathname === '/api/admin/change-password' && method === 'POST') {
-    const admin = await requireAdminAuth(req, url);
-    if (!admin) return sendError(res, 401, 'Unauthorized');
-
+  // Admin: Change Password (POST /api/admin/security/change-password or /api/admin/change-password)
+  if ((pathname === '/api/admin/security/change-password' || pathname === '/api/admin/change-password') && method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const { newPassword, currentPassword } = body;
+      const { newPassword, currentPassword, confirmPassword } = body;
 
-      if (currentPassword && !(await db.verifyTeacherPassword(currentPassword))) {
-        return sendError(res, 401, 'Current password does not match');
+      if (!currentPassword) {
+        return sendError(res, 400, 'Current password is required.');
       }
-
       if (!newPassword || newPassword.length < 6) {
-        return sendError(res, 400, 'New password must be at least 6 characters long');
+        return sendError(res, 400, 'New password must be at least 6 characters long.');
+      }
+      if (confirmPassword && newPassword !== confirmPassword) {
+        return sendError(res, 400, 'New passwords do not match.');
+      }
+      if (newPassword === currentPassword) {
+        return sendError(res, 400, 'New password must be different from current password.');
       }
 
+      // Rate limit password change attempts
+      const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '127.0.0.1';
+      const pwRateKey = `admin_pw_change:${clientIp}`;
+      const pwRate = checkRateLimit(pwRateKey, 5, 5 * 60 * 1000);
+      if (!pwRate.allowed) {
+        return sendError(res, 429, 'Too many failed password change attempts. Please wait 5 minutes and try again.', {
+          retryAfter: pwRate.retryAfter
+        });
+      }
+
+      const isValidCurrent = await db.verifyTeacherPassword(currentPassword);
+      if (!isValidCurrent) {
+        recordFailedAttempt(pwRateKey, 5, 5 * 60 * 1000);
+        return sendError(res, 401, 'Current password is incorrect.');
+      }
+
+      resetRateLimit(pwRateKey);
       await db.updateTeacherPassword(newPassword);
-      return sendJson(res, 200, { success: true, message: 'Password updated successfully' });
+
+      // Issue a fresh active session for the authenticated teacher so current portal stays open
+      const newSession = await db.createTeacherSession(req.adminAuth.session.user_id, req.adminAuth.session.remember_me === 1);
+      const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+      const newCookie = buildCookieHeader('ha_admin_session', newSession.token, {
+        maxAge: newSession.maxAgeSeconds,
+        secure: isSecure,
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/'
+      });
+
+      return sendJsonWithCookie(req, res, 200, {
+        success: true,
+        message: 'Your password has been changed successfully.',
+        token: newSession.token
+      }, newCookie);
     } catch (err) {
-      return sendError(res, 500, err.message);
+      return sendError(res, 500, err.message || 'Failed to update password.');
+    }
+  }
+
+  // Admin: Logout All Devices (POST /api/admin/security/logout-all or /api/admin/logout-all)
+  if ((pathname === '/api/admin/security/logout-all' || pathname === '/api/admin/logout-all') && method === 'POST') {
+    try {
+      await db.revokeAllTeacherSessions(req.adminAuth.session.user_id);
+      const isSecure = Boolean(process.env.NETLIFY || process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https');
+      const clearCookie = buildCookieHeader('ha_admin_session', '', { maxAge: 0, path: '/', secure: isSecure, httpOnly: true });
+      return sendJsonWithCookie(req, res, 200, {
+        success: true,
+        message: 'Logged out of all devices successfully.'
+      }, clearCookie);
+    } catch (err) {
+      return sendError(res, 500, 'Failed to log out from all devices.');
     }
   }
 

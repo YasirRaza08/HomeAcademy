@@ -2559,6 +2559,8 @@
         headers["Authorization"] = `Bearer ${this.token}`;
       }
       const config = {
+        credentials: "include",
+        // Send and receive HTTP-only cookies
         ...options,
         headers
       };
@@ -2604,10 +2606,12 @@
       return res;
     }
     async getMe() {
-      if (!this.token) return null;
       try {
         const res = await this.request("/api/auth/me");
-        return res.student;
+        if (res && res.role === "student" && res.student) {
+          return res.student;
+        }
+        return null;
       } catch (err) {
         if (err.status === 401) {
           this.setToken(null);
@@ -2625,19 +2629,26 @@
     // ------------------------------------------------------------------------
     // TEACHER / ADMIN
     // ------------------------------------------------------------------------
-    async adminLogin(password) {
+    async adminLogin(arg1, arg2, arg3) {
+      let payload = {};
+      if (typeof arg1 === "object" && arg1 !== null) {
+        payload = arg1;
+      } else if (arg2 !== void 0) {
+        payload = { emailOrUsername: arg1, password: arg2, rememberMe: Boolean(arg3) };
+      } else {
+        payload = { password: arg1, rememberMe: true };
+      }
       const res = await this.request("/api/admin/login", {
         method: "POST",
-        body: { password }
+        body: payload
       });
       if (res.token) this.setAdminToken(res.token);
       return res;
     }
     async adminGetMe() {
-      if (!this.adminToken) return false;
       try {
         const res = await this.request("/api/admin/me", { isAdmin: true });
-        return Boolean(res.authenticated);
+        return res && Boolean(res.authenticated);
       } catch (e) {
         this.setAdminToken(null);
         return false;
@@ -2645,10 +2656,18 @@
     }
     async adminLogout() {
       try {
-        await this.request("/api/admin/logout", { method: "POST", isAdmin: true });
+        await this.request("/api/auth/logout", { method: "POST", isAdmin: true });
       } catch (e) {
       }
       this.setAdminToken(null);
+    }
+    async adminLogoutAll() {
+      const res = await this.request("/api/admin/security/logout-all", {
+        method: "POST",
+        isAdmin: true
+      });
+      this.setAdminToken(null);
+      return res;
     }
     async adminGetRoster() {
       return this.request("/api/admin/students", { isAdmin: true });
@@ -2705,12 +2724,20 @@
         body: settings
       });
     }
-    async adminChangePassword(newPassword) {
-      return this.request("/api/admin/change-password", {
+    async adminChangePassword(arg1, arg2) {
+      let payload = {};
+      if (typeof arg1 === "object" && arg1 !== null) {
+        payload = arg1;
+      } else {
+        payload = { newPassword: arg1, currentPassword: arg2 };
+      }
+      const res = await this.request("/api/admin/security/change-password", {
         method: "POST",
         isAdmin: true,
-        body: { newPassword }
+        body: payload
       });
+      if (res.token) this.setAdminToken(res.token);
+      return res;
     }
     async adminGetCurriculum() {
       return this.request("/api/admin/curriculum", { isAdmin: true });
@@ -2869,7 +2896,7 @@
       }
     }
   };
-  var apiClient = new ApiClient();
+  var apiClient2 = new ApiClient();
 
   // js/state.js
   var STORAGE_KEY = "home_academy_v3_production";
@@ -2938,14 +2965,13 @@
           } else {
             parsed.currentStudentId = null;
           }
-          if (!parsed.teacherAuth) {
-            parsed.teacherAuth = {
-              username: "teacher",
+          delete parsed.teacherAuth;
+          if (!parsed.teacherProfile) {
+            parsed.teacherProfile = {
+              name: "Sir Zubair",
               email: "teacher@homeacademy.com",
-              password: "pakistan786"
+              role: "teacher"
             };
-          } else if (parsed.teacherAuth.password === "admin123") {
-            parsed.teacherAuth.password = "pakistan786";
           }
           parsed.isAdmin = false;
           return parsed;
@@ -2962,10 +2988,10 @@
         curriculumCustomized: false,
         roleplays: JSON.parse(JSON.stringify(OFFICIAL_ROLEPLAYS)),
         achievements: ACHIEVEMENTS,
-        teacherAuth: {
-          username: "teacher",
+        teacherProfile: {
+          name: "Sir Zubair",
           email: "teacher@homeacademy.com",
-          password: "pakistan786"
+          role: "teacher"
         },
         dailyChallenge: {
           id: "dc_" + (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
@@ -3027,26 +3053,26 @@
     async initBackend() {
       if (typeof window === "undefined") return;
       try {
-        const classRes = await apiClient.getClassInfo().catch(() => null);
+        const classRes = await apiClient2.getClassInfo().catch(() => null);
         if (classRes && classRes.success) {
           if (!this.state.classInfo) this.state.classInfo = {};
           this.state.classInfo.name = classRes.className || this.state.classInfo.name;
           this.state.classInfo.code = classRes.classCode || this.state.classInfo.code;
           this.state.classInfo.teacher = classRes.teacher || this.state.classInfo.teacher;
         }
-        const currRes = await apiClient.getCurriculum().catch(() => null);
+        const currRes = await apiClient2.getCurriculum().catch(() => null);
         if (currRes && Array.isArray(currRes.topics) && currRes.topics.length > 0) {
           this.state.curriculumTopics = currRes.topics;
         }
-        const rpRes = await apiClient.getRoleplays().catch(() => null);
+        const rpRes = await apiClient2.getRoleplays().catch(() => null);
         if (rpRes && Array.isArray(rpRes.roleplays) && rpRes.roleplays.length > 0) {
           this.state.roleplays = rpRes.roleplays;
         }
-        const lbRes = await apiClient.getLeaderboard(100).catch(() => null);
+        const lbRes = await apiClient2.getLeaderboard(100).catch(() => null);
         if (lbRes && Array.isArray(lbRes.leaderboard)) {
           this.state.students = lbRes.leaderboard.map((s) => ({ ...s }));
         }
-        const me = await apiClient.getMe().catch(() => null);
+        const me = await apiClient2.getMe().catch(() => null);
         if (me) {
           this.state.currentStudentId = me.id;
           const idx = this.state.students.findIndex((s) => s.id === me.id);
@@ -3060,17 +3086,17 @@
         } else {
           this.state.currentStudentId = null;
           this.saveSession(null);
-          apiClient.clearToken();
+          apiClient2.clearToken();
         }
-        const isAdmin = await apiClient.adminGetMe().catch(() => false);
+        const isAdmin = await apiClient2.adminGetMe().catch(() => false);
         if (isAdmin) {
           this.state.isAdmin = true;
           this.notify("ADMIN_STATUS_CHANGED", true);
         }
         this.saveState();
-        apiClient.subscribeEvents(async (eventType, eventData) => {
+        apiClient2.subscribeEvents(async (eventType, eventData) => {
           if (eventType === "leaderboard_update" || eventType === "student_joined") {
-            const freshLb = await apiClient.getLeaderboard(100).catch(() => null);
+            const freshLb = await apiClient2.getLeaderboard(100).catch(() => null);
             if (freshLb && Array.isArray(freshLb.leaderboard)) {
               this.state.students = freshLb.leaderboard.map((s) => ({ ...s }));
               const current = this.getCurrentStudent();
@@ -3080,7 +3106,7 @@
               this.notify("LEADERBOARD_UPDATED", this.state.students);
             }
             if (this.state.currentStudentId) {
-              const freshMe = await apiClient.getMe().catch(() => null);
+              const freshMe = await apiClient2.getMe().catch(() => null);
               if (freshMe) {
                 const idx = this.state.students.findIndex((s) => s.id === freshMe.id);
                 if (idx >= 0) this.state.students[idx] = freshMe;
@@ -3088,13 +3114,13 @@
               }
             }
           } else if (eventType === "curriculum_updated") {
-            const curr = await apiClient.getCurriculum().catch(() => null);
+            const curr = await apiClient2.getCurriculum().catch(() => null);
             if (curr && Array.isArray(curr.topics)) {
               this.state.curriculumTopics = curr.topics;
               this.notify("CURRICULUM_UPDATED", curr.topics);
             }
           } else if (eventType === "roleplay_updated") {
-            const rps = await apiClient.getRoleplays().catch(() => null);
+            const rps = await apiClient2.getRoleplays().catch(() => null);
             if (rps && Array.isArray(rps.roleplays)) {
               this.state.roleplays = rps.roleplays;
               this.notify("ROLEPLAYS_UPDATED", rps.roleplays);
@@ -3129,9 +3155,9 @@
       this.state.currentStudentId = null;
       this.state.isAdmin = false;
       this.saveSession(null);
-      apiClient.logout().catch(() => {
+      apiClient2.logout().catch(() => {
       });
-      apiClient.adminLogout().catch(() => {
+      apiClient2.adminLogout().catch(() => {
       });
       this.notify("STUDENT_LOGGED_OUT", null);
     }
@@ -3140,53 +3166,75 @@
     }
     setAdmin(isAdmin) {
       this.state.isAdmin = Boolean(isAdmin);
-      if (!this.state.isAdmin) {
-        apiClient.adminLogout().catch(() => {
-        });
-      }
       this.notify("ADMIN_STATUS_CHANGED", this.state.isAdmin);
     }
-    // Teacher Authentication: Verify teacher password
-    verifyTeacherLogin(passwordOrIdentifier, optionalPassword) {
-      const password = optionalPassword !== void 0 ? optionalPassword : passwordOrIdentifier;
+    // Teacher Authentication: Authenticate against backend REST API & Turso database
+    async verifyTeacherLogin(identifierOrPassword, optionalPassword, rememberMe = true) {
+      let identifier = null;
+      let password = null;
+      let remember = true;
+      if (typeof identifierOrPassword === "object" && identifierOrPassword !== null) {
+        identifier = identifierOrPassword.identifier || identifierOrPassword.emailOrUsername || identifierOrPassword.username || identifierOrPassword.email;
+        password = identifierOrPassword.password;
+        remember = identifierOrPassword.rememberMe !== void 0 ? Boolean(identifierOrPassword.rememberMe) : true;
+      } else if (optionalPassword !== void 0) {
+        identifier = identifierOrPassword;
+        password = optionalPassword;
+        remember = Boolean(rememberMe);
+      } else {
+        password = identifierOrPassword;
+        remember = true;
+      }
       const cleanPass = (password || "").trim();
       if (!cleanPass) {
         throw new Error("Please enter the Teacher Password.");
       }
-      const auth = this.state.teacherAuth || { password: "pakistan786" };
-      if (cleanPass !== auth.password) {
-        throw new Error("Incorrect teacher password. Please verify and try again.");
-      }
-      this.setAdmin(true);
-      apiClient.adminLogin(cleanPass).catch((err) => {
-        console.warn("Backend admin login sync:", err.message);
+      const res = await apiClient2.adminLogin({
+        emailOrUsername: identifier,
+        password: cleanPass,
+        rememberMe: remember
       });
-      return true;
+      this.setAdmin(true);
+      if (res.user || res.teacher) {
+        this.state.teacherProfile = res.user || res.teacher;
+      }
+      return res;
     }
     // Teacher Security Settings: Change Teacher Portal Password
-    updateTeacherPassword(currentPassword, newPassword) {
-      const auth = this.state.teacherAuth || {
-        username: "teacher",
-        email: "teacher@homeacademy.com",
-        password: "pakistan786"
-      };
-      if (currentPassword !== auth.password) {
-        throw new Error("Current teacher password does not match.");
+    async updateTeacherPassword(currentPassword, newPassword, confirmPassword) {
+      if (!currentPassword) {
+        throw new Error("Please enter your current password.");
       }
       if (!newPassword || newPassword.length < 6) {
         throw new Error("New teacher password must be at least 6 characters long.");
       }
+      if (confirmPassword && newPassword !== confirmPassword) {
+        throw new Error("New passwords do not match.");
+      }
       if (newPassword === currentPassword) {
         throw new Error("New password must be different from your current password.");
       }
-      auth.password = newPassword;
-      this.state.teacherAuth = auth;
-      this.saveState();
-      apiClient.adminChangePassword(newPassword).catch((err) => {
-        console.warn("Backend teacher password update:", err.message);
+      const res = await apiClient2.adminChangePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword
       });
       this.notify("TEACHER_PASSWORD_CHANGED", { updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      return true;
+      return res;
+    }
+    async logoutAdmin() {
+      try {
+        await apiClient2.adminLogout();
+      } catch (e) {
+      }
+      this.setAdmin(false);
+    }
+    async logoutAdminAllDevices() {
+      try {
+        await apiClient2.adminLogoutAll();
+      } catch (e) {
+      }
+      this.setAdmin(false);
     }
     // Teacher Management: Update Class Name, Private Class Code & Teacher Name
     updateClassSettings({ name, code, teacher }) {
@@ -3204,7 +3252,7 @@
         this.state.classInfo.teacher = "Sir Zubair";
       }
       this.saveState();
-      apiClient.adminUpdateSettings({ name: cleanName, code: cleanCode, teacher: this.state.classInfo.teacher }).catch((err) => {
+      apiClient2.adminUpdateSettings({ name: cleanName, code: cleanCode, teacher: this.state.classInfo.teacher }).catch((err) => {
         console.warn("Backend class settings update:", err.message);
       });
       this.notify("CLASS_SETTINGS_UPDATED", this.state.classInfo);
@@ -3234,7 +3282,7 @@
       }
       let backendStudent = null;
       try {
-        const res = await apiClient.register({
+        const res = await apiClient2.register({
           name: cleanName,
           email: cleanEmail,
           password,
@@ -3298,7 +3346,7 @@
       if (!password) throw new Error("Please enter your password.");
       let backendStudent = null;
       try {
-        const res = await apiClient.login({ email: cleanEmail, password });
+        const res = await apiClient2.login({ email: cleanEmail, password });
         if (res && res.student) {
           backendStudent = res.student;
         }
@@ -3430,7 +3478,7 @@
         if (!prog.learned) {
           prog.learned = true;
           this.addXP(10, `learn_${topicId}`);
-          apiClient.recordTopicLearn(topicId).catch(() => {
+          apiClient2.recordTopicLearn(topicId).catch(() => {
           });
         }
       } else if (step === "practice") {
@@ -3443,7 +3491,7 @@
           student.stats.correctAnswers = (student.stats.correctAnswers || 0) + data.correctCount;
           student.stats.totalQuestions = (student.stats.totalQuestions || 0) + (data.totalCount || data.correctCount);
         }
-        apiClient.recordTopicPractice(topicId, 1).catch(() => {
+        apiClient2.recordTopicPractice(topicId, 1).catch(() => {
         });
       } else if (step === "quiz") {
         const scorePercent = data.scorePercent || 0;
@@ -3466,7 +3514,7 @@
           }
         }
         const submissionToken = data.submissionToken || "qtok_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
-        apiClient.recordTopicQuiz(topicId, {
+        apiClient2.recordTopicQuiz(topicId, {
           submissionToken,
           score: data.correctCount || 0,
           total: data.totalCount || 5,
@@ -3525,7 +3573,7 @@
       if (result.xpEarned && result.xpEarned > 0) {
         this.addXP(result.xpEarned, "full_grammar_test");
       }
-      apiClient.recordFullGrammarTest({
+      apiClient2.recordFullGrammarTest({
         submissionToken,
         score: result.score || 0,
         total: result.total || 0,
@@ -3562,7 +3610,7 @@
         xpReward
       });
       this.addXP(xpReward, `activity_${topicId}_${activityType}`);
-      apiClient.recordActivityCompletion({
+      apiClient2.recordActivityCompletion({
         topicId,
         activityType,
         xpReward
@@ -3686,7 +3734,7 @@
         this.state.currentStudentId = this.state.students.length ? this.state.students[0].id : null;
         this.saveSession(this.state.currentStudentId);
       }
-      apiClient.adminDeleteStudent(studentId).catch(() => {
+      apiClient2.adminDeleteStudent(studentId).catch(() => {
       });
       this.notify("ADMIN_STUDENT_DELETED", studentId);
     }
@@ -3715,7 +3763,7 @@
       if (topic) {
         topic.active = !topic.active;
         this.state.curriculumCustomized = true;
-        apiClient.adminToggleCurriculum(topicId).catch(() => {
+        apiClient2.adminToggleCurriculum(topicId).catch(() => {
         });
         this.notify("ADMIN_TOPIC_TOGGLED", topic);
       }
@@ -3730,7 +3778,7 @@
       this.state.curriculumTopics.forEach((t, i) => {
         t.number = String(i + 1).padStart(2, "0");
       });
-      apiClient.adminDeleteCurriculum(topicId).catch(() => {
+      apiClient2.adminDeleteCurriculum(topicId).catch(() => {
       });
       this.notify("ADMIN_TOPIC_DELETED", deletedTopic);
       return deletedTopic;
@@ -3738,7 +3786,7 @@
     adminResetCurriculum() {
       this.state.curriculumTopics = JSON.parse(JSON.stringify(OFFICIAL_TOPICS));
       this.state.curriculumCustomized = false;
-      apiClient.adminResetCurriculum().catch(() => {
+      apiClient2.adminResetCurriculum().catch(() => {
       });
       this.notify("ADMIN_CURRICULUM_RESET", this.state.curriculumTopics);
       return this.state.curriculumTopics;
@@ -3819,7 +3867,7 @@
         xpEarned = 25;
         this.addXP(xpEarned, `roleplay_${roleplayId}_perfection`);
       }
-      apiClient.recordRoleplayCompletion(roleplayId, updatedProg.percent).catch(() => {
+      apiClient2.recordRoleplayCompletion(roleplayId, updatedProg.percent).catch(() => {
       });
       this.checkAchievements(student);
       this.notify("ROLEPLAY_COMPLETED", { student, roleplayId, result: updatedProg, xpEarned });
@@ -3854,7 +3902,7 @@
       const rp = this.state.roleplays.find((r) => r.id === id);
       if (!rp) throw new Error("Roleplay not found.");
       Object.assign(rp, updateData);
-      apiClient.adminUpdateRoleplay(id, updateData).catch(() => {
+      apiClient2.adminUpdateRoleplay(id, updateData).catch(() => {
       });
       this.notify("ADMIN_ROLEPLAY_UPDATED", rp);
       return rp;
@@ -3863,7 +3911,7 @@
       const rp = this.state.roleplays.find((r) => r.id === id);
       if (rp) {
         rp.active = !rp.active;
-        apiClient.adminToggleRoleplay(id).catch(() => {
+        apiClient2.adminToggleRoleplay(id).catch(() => {
         });
         this.notify("ADMIN_ROLEPLAY_TOGGLED", rp);
         return rp;
@@ -3876,14 +3924,14 @@
       this.state.roleplays.forEach((r, i) => {
         r.number = String(i + 1).padStart(2, "0");
       });
-      apiClient.adminDeleteRoleplay(id).catch(() => {
+      apiClient2.adminDeleteRoleplay(id).catch(() => {
       });
       this.notify("ADMIN_ROLEPLAY_DELETED", deleted);
       return deleted;
     }
     adminResetRoleplays() {
       this.state.roleplays = JSON.parse(JSON.stringify(OFFICIAL_ROLEPLAYS));
-      apiClient.adminResetRoleplays().catch(() => {
+      apiClient2.adminResetRoleplays().catch(() => {
       });
       this.notify("ADMIN_ROLEPLAYS_RESET", this.state.roleplays);
       return this.state.roleplays;
@@ -3933,9 +3981,6 @@
   }
   function schoolIcon(size = 20, className = "") {
     return createSvgIcon('<path d="M18 2h-3a5 5 0 0 0-5 5v14h10V4a2 2 0 0 0-2-2z"></path><path d="M10 10H6a2 2 0 0 0-2 2v9h6"></path><circle cx="14" cy="7" r="1"></circle>', size, className);
-  }
-  function lockIcon(size = 20, className = "") {
-    return createSvgIcon('<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>', size, className);
   }
   function pencilIcon(size = 18, className = "") {
     return createSvgIcon('<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>', size, className);
@@ -8758,7 +8803,7 @@
     const roleplays = stateManager.state.roleplays || [];
     let notifications = [];
     try {
-      const notifRes = await apiClient.adminGetNotifications(25);
+      const notifRes = await apiClient2.adminGetNotifications(25);
       if (notifRes && notifRes.notifications) {
         notifications = notifRes.notifications;
       }
@@ -8785,13 +8830,46 @@
           </p>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-outline btn-sm" id="admin-lock-btn" style="display: inline-flex; align-items: center; gap: 6px;">
-            ${lockIcon(14)} Lock Portal
-          </button>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <button class="btn btn-primary btn-sm" id="admin-switch-dash">
             View Student Dashboard \u2192
           </button>
+
+          <!-- Professional Teacher/Admin Account Menu (Section 21) -->
+          <div style="position: relative;" id="admin-account-menu-wrapper">
+            <button id="admin-account-btn" type="button" class="btn btn-outline btn-sm"
+              style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); padding: 5px 12px; cursor: pointer;">
+              <span style="font-size: 1.1rem;">\u{1F468}\u200D\u{1F3EB}</span>
+              <div style="text-align: left; line-height: 1.15;">
+                <div style="font-size: 0.82rem; font-weight: 800; color: var(--ha-navy);">${classInfo.teacher || "Sir Zubair"}</div>
+                <div style="font-size: 0.68rem; color: var(--ha-text-muted);">Teacher / Admin</div>
+              </div>
+              <span style="font-size: 0.65rem; color: var(--ha-text-muted); margin-left: 2px;">\u25BC</span>
+            </button>
+
+            <!-- Dropdown Popover -->
+            <div id="admin-account-dropdown" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); width: 220px; background: #ffffff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden; padding: 4px 0;">
+              <div style="padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid var(--ha-border);">
+                <div style="font-weight: 800; font-size: 0.86rem; color: var(--ha-navy); display: flex; align-items: center; gap: 6px;">
+                  <span>\u{1F464}</span> ${classInfo.teacher || "Sir Zubair"}
+                </div>
+                <div style="font-size: 0.72rem; color: var(--ha-text-muted); margin-top: 2px;">Teacher / Admin Portal</div>
+              </div>
+              <button type="button" class="admin-drop-btn" id="menu-go-security" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-navy); text-align: left;">
+                <span>\u2699\uFE0F</span> Security
+              </button>
+              <button type="button" class="admin-drop-btn" id="menu-go-changepass" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-navy); text-align: left;">
+                <span>\u{1F511}</span> Change Password
+              </button>
+              <div style="height: 1px; background: var(--ha-border); margin: 3px 0;"></div>
+              <button type="button" class="admin-drop-btn text-danger" id="menu-logout-all" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-red); text-align: left;">
+                <span>\u{1F4F1}</span> Log out of all devices
+              </button>
+              <button type="button" class="admin-drop-btn text-danger" id="menu-admin-logout" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-red); text-align: left;">
+                <span>\u{1F6AA}</span> Logout
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -8933,11 +9011,82 @@
       });
     });
     switchTab(currentAdminTab);
-    container.querySelector("#admin-lock-btn")?.addEventListener("click", () => {
+    const accountBtn = container.querySelector("#admin-account-btn");
+    const accountDropdown = container.querySelector("#admin-account-dropdown");
+    accountBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
       sound.playClick();
-      stateManager.setAdmin(false);
-      if (onNavigate) onNavigate("home");
+      if (accountDropdown) {
+        accountDropdown.style.display = accountDropdown.style.display === "block" ? "none" : "block";
+      }
     });
+    document.addEventListener("click", () => {
+      if (accountDropdown) accountDropdown.style.display = "none";
+    });
+    accountDropdown?.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+    container.querySelector("#menu-go-security")?.addEventListener("click", () => {
+      sound.playClick();
+      if (accountDropdown) accountDropdown.style.display = "none";
+      switchTab("security");
+    });
+    container.querySelector("#menu-go-changepass")?.addEventListener("click", () => {
+      sound.playClick();
+      if (accountDropdown) accountDropdown.style.display = "none";
+      switchTab("security");
+      setTimeout(() => {
+        container.querySelector("#sec-curr-pass")?.focus();
+      }, 100);
+    });
+    container.querySelector("#menu-admin-logout")?.addEventListener("click", async () => {
+      sound.playClick();
+      if (accountDropdown) accountDropdown.style.display = "none";
+      await stateManager.logoutAdmin();
+      if (onNavigate) onNavigate("home");
+      window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
+    });
+    container.querySelector("#menu-logout-all")?.addEventListener("click", () => {
+      sound.playClick();
+      if (accountDropdown) accountDropdown.style.display = "none";
+      showLogoutAllModal();
+    });
+    function showLogoutAllModal() {
+      let modal = document.getElementById("ha-logout-all-modal");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "ha-logout-all-modal";
+        modal.innerHTML = `
+        <div class="ha-modal-backdrop" id="logout-all-backdrop" style="position: fixed; inset: 0; background: rgba(10, 37, 88, 0.6); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+          <div class="ha-modal-dialog" style="max-width: 440px; width: 92%; background: #fff; border-radius: var(--radius-lg); padding: 26px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">\u{1F4F1}</div>
+            <h3 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 8px; font-weight: 800;">Log out from all other devices?</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 22px; line-height: 1.45;">
+              This will revoke all active teacher sessions across all browsers and devices. You will need to log in again.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+              <button type="button" class="btn btn-outline" id="btn-cancel-logout-all" style="flex: 1; padding: 10px; font-weight: 700;">Cancel</button>
+              <button type="button" class="btn btn-secondary" id="btn-confirm-logout-all" style="flex: 1; padding: 10px; font-weight: 800; background: var(--ha-red); border-color: var(--ha-red);">Confirm Logout</button>
+            </div>
+          </div>
+        </div>
+      `;
+        document.body.appendChild(modal);
+        modal.querySelector("#btn-cancel-logout-all")?.addEventListener("click", () => {
+          modal.style.display = "none";
+        });
+        modal.querySelector("#logout-all-backdrop")?.addEventListener("click", (e) => {
+          if (e.target.id === "logout-all-backdrop") modal.style.display = "none";
+        });
+        modal.querySelector("#btn-confirm-logout-all")?.addEventListener("click", async () => {
+          modal.style.display = "none";
+          await stateManager.logoutAdminAllDevices();
+          if (onNavigate) onNavigate("home");
+          window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
+        });
+      }
+      modal.style.display = "block";
+    }
     container.querySelector("#admin-switch-dash")?.addEventListener("click", () => {
       sound.playClick();
       if (onNavigate) onNavigate("dashboard");
@@ -9150,7 +9299,7 @@
         if (isNaN(amount) || amount <= 0) return alert("Please enter a valid positive number.");
         const reason = prompt("Reason for bonus XP (optional):", "Great classroom participation") || "Faculty Award";
         try {
-          await apiClient.adminAwardXP(studentId, amount, reason);
+          await apiClient2.adminAwardXP(studentId, amount, reason);
           sound.playSuccess();
           alert(`Awarded +${amount} XP to ${studentName}!`);
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9165,7 +9314,7 @@
         const studentId = btn.dataset.id;
         if (confirm("Are you sure you want to permanently remove this student from the class database?")) {
           try {
-            await apiClient.adminDeleteStudent(studentId);
+            await apiClient2.adminDeleteStudent(studentId);
             stateManager.adminDeleteStudent(studentId);
             sound.playClick();
             window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9200,7 +9349,7 @@
     if (!mount) return;
     let profileData = null;
     try {
-      const res = await apiClient.adminGetStudentProfile(studentId);
+      const res = await apiClient2.adminGetStudentProfile(studentId);
       if (res && res.profile) profileData = res.profile;
     } catch (e) {
     }
@@ -9366,7 +9515,7 @@
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         try {
-          await apiClient.adminToggleCurriculum(id);
+          await apiClient2.adminToggleCurriculum(id);
           stateManager.adminToggleTopic(id);
           sound.playClick();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9380,7 +9529,7 @@
         const id = btn.dataset.id;
         if (confirm(`Delete topic "${id}"? Remaining topics will be renumbered automatically.`)) {
           try {
-            await apiClient.adminDeleteCurriculum(id);
+            await apiClient2.adminDeleteCurriculum(id);
             stateManager.adminDeleteTopic(id);
             sound.playClick();
             window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9393,7 +9542,7 @@
     mount.querySelector("#btn-admin-reset-curriculum")?.addEventListener("click", async () => {
       if (confirm("Reset curriculum to the 6 official class topics?")) {
         try {
-          await apiClient.adminResetCurriculum();
+          await apiClient2.adminResetCurriculum();
           stateManager.adminResetCurriculum();
           sound.playSuccess();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9430,7 +9579,7 @@
     const qListMount = mount.querySelector("#questions-list-mount");
     const loadQuestions = async (topicId = null) => {
       try {
-        const res = await apiClient.adminGetQuestions(topicId);
+        const res = await apiClient2.adminGetQuestions(topicId);
         const questions = res.questions || [];
         if (questions.length === 0) {
           qListMount.innerHTML = `<p style="padding: 20px; text-align: center; color: var(--ha-text-muted);">No questions found.</p>`;
@@ -9476,7 +9625,7 @@
       const answer = parseInt(prompt("Index of correct option (0, 1, 2, or 3):", "0"), 10) || 0;
       const explanation = prompt("Explanation (optional):") || "";
       try {
-        await apiClient.adminCreateQuestion({ topicId, question, options, correctAnswer: answer, explanation });
+        await apiClient2.adminCreateQuestion({ topicId, question, options, correctAnswer: answer, explanation });
         sound.playSuccess();
         alert("Question created in persistent database!");
         loadQuestions();
@@ -9587,7 +9736,7 @@
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         try {
-          await apiClient.adminToggleRoleplay(id);
+          await apiClient2.adminToggleRoleplay(id);
           stateManager.adminToggleRoleplayActive(id);
           sound.playClick();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9606,7 +9755,7 @@
         const scenario = prompt("Edit scenario:", rp.scenario);
         if (!scenario) return;
         try {
-          await apiClient.adminUpdateRoleplay(id, { title, scenario });
+          await apiClient2.adminUpdateRoleplay(id, { title, scenario });
           stateManager.adminUpdateRoleplay(id, { title, scenario });
           sound.playSuccess();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9618,7 +9767,7 @@
     mount.querySelector("#btn-admin-reset-rp")?.addEventListener("click", async () => {
       if (confirm("Reset to the 5 official roleplay presentations?")) {
         try {
-          await apiClient.adminResetRoleplays();
+          await apiClient2.adminResetRoleplays();
           stateManager.adminResetRoleplays();
           sound.playSuccess();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -9709,7 +9858,7 @@
   `;
     mount.querySelector("#btn-mark-all-read")?.addEventListener("click", async () => {
       try {
-        await apiClient.adminMarkNotificationsRead();
+        await apiClient2.adminMarkNotificationsRead();
         sound.playSuccess();
         window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
       } catch (e) {
@@ -9748,7 +9897,7 @@
       const code = mount.querySelector("#set-class-code").value;
       const teacher = mount.querySelector("#set-class-teacher").value;
       try {
-        await apiClient.adminUpdateSettings({ name, code, teacher });
+        await apiClient2.adminUpdateSettings({ name, code, teacher });
         stateManager.updateClassSettings({ name, code, teacher });
         sound.playSuccess();
         alert("Class settings updated successfully!");
@@ -9760,48 +9909,160 @@
   }
   function renderSecurityTab(mount) {
     mount.innerHTML = `
-    <div class="ha-card" style="padding: 24px; max-width: 600px; border-top: 4px solid var(--ha-red);">
-      <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 6px;">Faculty Security & Password</h2>
-      <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 20px;">
-        Update the Teacher Portal password. Changes are verified and hashed server-side.
-      </p>
+    <div style="display: flex; flex-direction: column; gap: 20px; max-width: 620px;">
+      
+      <!-- Card 1: Change Password -->
+      <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-red);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 1.3rem;">\u{1F511}</span>
+          <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Change Teacher Password</h2>
+        </div>
+        <p style="font-size: 0.86rem; color: var(--ha-text-muted); margin: 0 0 18px;">
+          Update the Teacher Portal password. Current password verification and bcrypt hashing (cost 10) are enforced server-side.
+        </p>
 
-      <form id="form-admin-password" style="display: flex; flex-direction: column; gap: 14px;">
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">CURRENT PASSWORD</label>
-          <input type="password" id="sec-curr-pass" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+        <div id="sec-feedback-success" style="display: none; padding: 11px 14px; background: rgba(34, 197, 94, 0.12); color: #166534; border-radius: var(--radius-sm); font-size: 0.86rem; font-weight: 700; border-left: 4px solid #22c55e; margin-bottom: 14px;">
+          \u2713 Your password has been changed successfully.
         </div>
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">NEW PASSWORD (Min 6 chars)</label>
-          <input type="password" id="sec-new-pass" minlength="6" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+
+        <div id="sec-feedback-error" style="display: none; padding: 11px 14px; background: var(--ha-red-light); color: var(--ha-red); border-radius: var(--radius-sm); font-size: 0.86rem; font-weight: 700; border-left: 4px solid var(--ha-red); margin-bottom: 14px;"></div>
+
+        <form id="form-admin-password" style="display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label for="sec-curr-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              CURRENT PASSWORD *
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-curr-pass" required autocomplete="current-password"
+                placeholder="Enter current teacher password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-curr-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                \u{1F441}\uFE0F
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="sec-new-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              NEW PASSWORD * (Minimum 6 characters)
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-new-pass" minlength="6" required autocomplete="new-password"
+                placeholder="Create new secure password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-new-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                \u{1F441}\uFE0F
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="sec-conf-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              CONFIRM NEW PASSWORD *
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-conf-pass" minlength="6" required autocomplete="new-password"
+                placeholder="Re-enter new password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-conf-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                \u{1F441}\uFE0F
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" id="btn-submit-change-pass" class="btn btn-secondary" style="background: var(--ha-red); border-color: var(--ha-red); margin-top: 6px; padding: 11px; font-weight: 800;">
+            Change Password
+          </button>
+        </form>
+      </div>
+
+      <!-- Card 2: Active Sessions & Multi-Device Security -->
+      <div class="ha-card" style="padding: 22px; border-top: 4px solid var(--ha-navy);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 1.3rem;">\u{1F4F1}</span>
+          <h2 style="font-size: 1.15rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Session & Device Management</h2>
         </div>
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">CONFIRM NEW PASSWORD</label>
-          <input type="password" id="sec-conf-pass" minlength="6" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+        <p style="font-size: 0.85rem; color: var(--ha-text-muted); margin: 0 0 16px; line-height: 1.4;">
+          Your login session is securely maintained with persistent HTTP-only cookies in Turso Cloud. If you used other devices, you can revoke them here.
+        </p>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-outline" id="btn-sec-logout-all" style="border-color: var(--ha-red); color: var(--ha-red); font-weight: 700;">
+            <span>\u{1F4F1}</span> Log out of all devices
+          </button>
         </div>
-        <button type="submit" class="btn btn-secondary" style="background: var(--ha-red); border-color: var(--ha-red); margin-top: 8px;">Change Password</button>
-      </form>
+      </div>
+
     </div>
   `;
+    mount.querySelectorAll(".toggle-pass-inline").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetInput = mount.querySelector(`#${btn.dataset.target}`);
+        if (targetInput) {
+          if (targetInput.type === "password") {
+            targetInput.type = "text";
+            btn.textContent = "\u{1F648}";
+          } else {
+            targetInput.type = "password";
+            btn.textContent = "\u{1F441}\uFE0F";
+          }
+        }
+      });
+    });
     mount.querySelector("#form-admin-password")?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const currentPassword = mount.querySelector("#sec-curr-pass").value;
-      const newPassword = mount.querySelector("#sec-new-pass").value;
-      const confirmPassword = mount.querySelector("#sec-conf-pass").value;
+      const currInput = mount.querySelector("#sec-curr-pass");
+      const newInput = mount.querySelector("#sec-new-pass");
+      const confInput = mount.querySelector("#sec-conf-pass");
+      const successBox = mount.querySelector("#sec-feedback-success");
+      const errorBox = mount.querySelector("#sec-feedback-error");
+      const submitBtn = mount.querySelector("#btn-submit-change-pass");
+      if (successBox) successBox.style.display = "none";
+      if (errorBox) errorBox.style.display = "none";
+      const currentPassword = currInput?.value;
+      const newPassword = newInput?.value;
+      const confirmPassword = confInput?.value;
       if (newPassword !== confirmPassword) {
-        return alert("New passwords do not match. Please re-enter.");
+        if (errorBox) {
+          errorBox.textContent = "New passwords do not match. Please re-enter.";
+          errorBox.style.display = "block";
+        }
+        return;
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = "<span>\u23F3</span> Changing password...";
       }
       try {
-        await apiClient.adminChangePassword(newPassword);
-        stateManager.updateTeacherPassword(currentPassword, newPassword);
+        await stateManager.updateTeacherPassword(currentPassword, newPassword, confirmPassword);
         sound.playSuccess();
-        alert("Teacher password updated successfully!");
-        mount.querySelector("#sec-curr-pass").value = "";
-        mount.querySelector("#sec-new-pass").value = "";
-        mount.querySelector("#sec-conf-pass").value = "";
+        if (successBox) {
+          successBox.textContent = "Your password has been changed successfully.";
+          successBox.style.display = "block";
+        }
+        if (currInput) currInput.value = "";
+        if (newInput) newInput.value = "";
+        if (confInput) confInput.value = "";
       } catch (err) {
-        alert(err.message);
+        sound.playWrong();
+        if (errorBox) {
+          errorBox.textContent = err.message || "Failed to change password.";
+          errorBox.style.display = "block";
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = "Change Password";
+        }
       }
+    });
+    mount.querySelector("#btn-sec-logout-all")?.addEventListener("click", () => {
+      sound.playClick();
+      const trigger = document.getElementById("menu-logout-all");
+      if (trigger) trigger.click();
     });
   }
 
@@ -9928,21 +10189,36 @@
                     </div>
                   </div>
 
-                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 14px;">
+                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 12px;">
                     <div>
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <label for="teacher-side-password" style="font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
+                      <label for="teacher-side-identifier" style="display: block; font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+                        TEACHER USERNAME OR EMAIL *
+                      </label>
+                      <input type="text" id="teacher-side-identifier" placeholder="e.g. teacher or teacher@homeacademy.com" value="teacher" required autocomplete="username"
+                        style="width: 100%; padding: 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                    </div>
+
+                    <div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label for="teacher-side-password" style="font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
                           TEACHER PASSWORD *
                         </label>
                       </div>
                       <div style="position: relative;">
                         <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password"
-                          style="width: 100%; padding: 12px 38px 12px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.95rem; outline: none; background: #fff;" />
+                          style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
                         <button type="button" class="toggle-password-btn" data-target="teacher-side-password"
                           style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
                           \u{1F441}\uFE0F
                         </button>
                       </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--ha-text-muted);">
+                      <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="teacher-side-remember" checked style="accent-color: var(--ha-red); width: 15px; height: 15px; cursor: pointer;" />
+                        <span>Keep me logged in (30 days)</span>
+                      </label>
                     </div>
 
                     <div id="teacher-side-error" style="display: none; padding: 9px 12px; background: var(--ha-red-light); color: var(--ha-red); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; border-left: 3px solid var(--ha-red);"></div>
@@ -10155,22 +10431,33 @@
         }
       });
       const teacherForm = modalContainer.querySelector("#teacher-side-login-form");
-      teacherForm?.addEventListener("submit", (e) => {
+      teacherForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const identifier = modalContainer.querySelector("#teacher-side-identifier")?.value?.trim();
         const password = modalContainer.querySelector("#teacher-side-password")?.value;
+        const rememberMe = modalContainer.querySelector("#teacher-side-remember")?.checked;
         const errorMsg = modalContainer.querySelector("#teacher-side-error");
         const submitBtn = modalContainer.querySelector("#teacher-side-submit-btn");
         if (errorMsg) errorMsg.style.display = "none";
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = "<span>\u23F3</span> Verifying credentials...";
+        }
         try {
-          stateManager.verifyTeacherLogin(password);
+          await stateManager.verifyTeacherLogin({ identifier, password, rememberMe });
           sound.playCorrect();
           closeModal();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
         } catch (err) {
           sound.playWrong();
           if (errorMsg) {
-            errorMsg.textContent = err.message || "Incorrect teacher password.";
+            errorMsg.textContent = err.message || "Incorrect password. Please try again.";
             errorMsg.style.display = "block";
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "TEACHER LOGIN";
           }
         }
       });
@@ -12792,10 +13079,19 @@
     }
     setupNavigation() {
       document.querySelectorAll(".nav-item").forEach((item) => {
-        item.addEventListener("click", () => {
+        item.addEventListener("click", async () => {
           sound.playClick();
           const route = item.dataset.route;
           if (route === "admin" && !stateManager.state.isAdmin) {
+            try {
+              const isValid = await apiClient.adminGetMe();
+              if (isValid) {
+                stateManager.setAdmin(true);
+                this.navigate("admin");
+                return;
+              }
+            } catch (e) {
+            }
             window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
             return;
           }
@@ -12803,10 +13099,19 @@
         });
       });
       document.querySelectorAll(".mobile-nav-item").forEach((item) => {
-        item.addEventListener("click", () => {
+        item.addEventListener("click", async () => {
           sound.playClick();
           const route = item.dataset.route;
           if (route === "admin" && !stateManager.state.isAdmin) {
+            try {
+              const isValid = await apiClient.adminGetMe();
+              if (isValid) {
+                stateManager.setAdmin(true);
+                this.navigate("admin");
+                return;
+              }
+            } catch (e) {
+            }
             window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
             return;
           }
@@ -13018,9 +13323,18 @@
           break;
         case "admin":
           if (!stateManager.state.isAdmin) {
-            const fallback = this.currentRoute === "admin" ? "home" : this.currentRoute;
-            this.navigate(fallback);
-            window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
+            apiClient.adminGetMe().then((isValid) => {
+              if (isValid) {
+                stateManager.setAdmin(true);
+                renderAdmin(this.container, onNav);
+              } else {
+                this.navigate("home");
+                window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
+              }
+            }).catch(() => {
+              this.navigate("home");
+              window.dispatchEvent(new CustomEvent("ha:open-join-modal", { detail: "teacher" }));
+            });
             return;
           }
           renderAdmin(this.container, onNav);

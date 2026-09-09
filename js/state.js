@@ -88,18 +88,17 @@ class StateManager {
           parsed.currentStudentId = null;
         }
 
-        // Ensure teacher credentials exist with initial password pakistan786
-        if (!parsed.teacherAuth) {
-          parsed.teacherAuth = {
-            username: 'teacher',
+        // Security rule: Remove any legacy plain-text teacherAuth from browser storage
+        delete parsed.teacherAuth;
+        if (!parsed.teacherProfile) {
+          parsed.teacherProfile = {
+            name: 'Sir Zubair',
             email: 'teacher@homeacademy.com',
-            password: 'pakistan786'
+            role: 'teacher'
           };
-        } else if (parsed.teacherAuth.password === 'admin123') {
-          parsed.teacherAuth.password = 'pakistan786';
         }
 
-        // Security rule: Never inherit admin privilege from previous browser sessions
+        // Security rule: Default admin flag to false until verified by server session
         parsed.isAdmin = false;
 
         return parsed;
@@ -117,10 +116,10 @@ class StateManager {
       curriculumCustomized: false,
       roleplays: JSON.parse(JSON.stringify(OFFICIAL_ROLEPLAYS)),
       achievements: ACHIEVEMENTS,
-      teacherAuth: {
-        username: 'teacher',
+      teacherProfile: {
+        name: 'Sir Zubair',
         email: 'teacher@homeacademy.com',
-        password: 'pakistan786'
+        role: 'teacher'
       },
       dailyChallenge: {
         id: 'dc_' + new Date().toISOString().split('T')[0],
@@ -323,67 +322,83 @@ class StateManager {
 
   setAdmin(isAdmin) {
     this.state.isAdmin = Boolean(isAdmin);
-    if (!this.state.isAdmin) {
-      apiClient.adminLogout().catch(() => {});
-    }
     this.notify('ADMIN_STATUS_CHANGED', this.state.isAdmin);
   }
 
-  // Teacher Authentication: Verify teacher password
-  verifyTeacherLogin(passwordOrIdentifier, optionalPassword) {
-    const password = optionalPassword !== undefined ? optionalPassword : passwordOrIdentifier;
-    const cleanPass = (password || '').trim();
+  // Teacher Authentication: Authenticate against backend REST API & Turso database
+  async verifyTeacherLogin(identifierOrPassword, optionalPassword, rememberMe = true) {
+    let identifier = null;
+    let password = null;
+    let remember = true;
 
+    if (typeof identifierOrPassword === 'object' && identifierOrPassword !== null) {
+      identifier = identifierOrPassword.identifier || identifierOrPassword.emailOrUsername || identifierOrPassword.username || identifierOrPassword.email;
+      password = identifierOrPassword.password;
+      remember = identifierOrPassword.rememberMe !== undefined ? Boolean(identifierOrPassword.rememberMe) : true;
+    } else if (optionalPassword !== undefined) {
+      identifier = identifierOrPassword;
+      password = optionalPassword;
+      remember = Boolean(rememberMe);
+    } else {
+      password = identifierOrPassword;
+      remember = true;
+    }
+
+    const cleanPass = (password || '').trim();
     if (!cleanPass) {
       throw new Error('Please enter the Teacher Password.');
     }
 
-    const auth = this.state.teacherAuth || { password: 'pakistan786' };
-    if (cleanPass !== auth.password) {
-      throw new Error('Incorrect teacher password. Please verify and try again.');
-    }
-
-    this.setAdmin(true);
-
-    // Concurrently authenticate against backend REST API session
-    apiClient.adminLogin(cleanPass).catch(err => {
-      console.warn('Backend admin login sync:', err.message);
+    const res = await apiClient.adminLogin({
+      emailOrUsername: identifier,
+      password: cleanPass,
+      rememberMe: remember
     });
 
-    return true;
+    this.setAdmin(true);
+    if (res.user || res.teacher) {
+      this.state.teacherProfile = res.user || res.teacher;
+    }
+    return res;
   }
 
   // Teacher Security Settings: Change Teacher Portal Password
-  updateTeacherPassword(currentPassword, newPassword) {
-    const auth = this.state.teacherAuth || {
-      username: 'teacher',
-      email: 'teacher@homeacademy.com',
-      password: 'pakistan786'
-    };
-
-    if (currentPassword !== auth.password) {
-      throw new Error('Current teacher password does not match.');
+  async updateTeacherPassword(currentPassword, newPassword, confirmPassword) {
+    if (!currentPassword) {
+      throw new Error('Please enter your current password.');
     }
-
     if (!newPassword || newPassword.length < 6) {
       throw new Error('New teacher password must be at least 6 characters long.');
     }
-
+    if (confirmPassword && newPassword !== confirmPassword) {
+      throw new Error('New passwords do not match.');
+    }
     if (newPassword === currentPassword) {
       throw new Error('New password must be different from your current password.');
     }
 
-    auth.password = newPassword;
-    this.state.teacherAuth = auth;
-    this.saveState();
-
-    // Update backend database
-    apiClient.adminChangePassword(newPassword).catch(err => {
-      console.warn('Backend teacher password update:', err.message);
+    const res = await apiClient.adminChangePassword({
+      currentPassword,
+      newPassword,
+      confirmPassword
     });
 
     this.notify('TEACHER_PASSWORD_CHANGED', { updatedAt: new Date().toISOString() });
-    return true;
+    return res;
+  }
+
+  async logoutAdmin() {
+    try {
+      await apiClient.adminLogout();
+    } catch (e) {}
+    this.setAdmin(false);
+  }
+
+  async logoutAdminAllDevices() {
+    try {
+      await apiClient.adminLogoutAll();
+    } catch (e) {}
+    this.setAdmin(false);
   }
 
   // Teacher Management: Update Class Name, Private Class Code & Teacher Name

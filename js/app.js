@@ -54,10 +54,18 @@ class App {
   setupNavigation() {
     // Desktop items
     document.querySelectorAll('.nav-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', async () => {
         sound.playClick();
         const route = item.dataset.route;
         if (route === 'admin' && !stateManager.state.isAdmin) {
+          try {
+            const isValid = await apiClient.adminGetMe();
+            if (isValid) {
+              stateManager.setAdmin(true);
+              this.navigate('admin');
+              return;
+            }
+          } catch (e) {}
           window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
           return;
         }
@@ -67,10 +75,18 @@ class App {
 
     // Mobile items
     document.querySelectorAll('.mobile-nav-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', async () => {
         sound.playClick();
         const route = item.dataset.route;
         if (route === 'admin' && !stateManager.state.isAdmin) {
+          try {
+            const isValid = await apiClient.adminGetMe();
+            if (isValid) {
+              stateManager.setAdmin(true);
+              this.navigate('admin');
+              return;
+            }
+          } catch (e) {}
           window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
           return;
         }
@@ -313,9 +329,18 @@ class App {
         break;
       case 'admin':
         if (!stateManager.state.isAdmin) {
-          const fallback = this.currentRoute === 'admin' ? 'home' : this.currentRoute;
-          this.navigate(fallback);
-          window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
+          apiClient.adminGetMe().then(isValid => {
+            if (isValid) {
+              stateManager.setAdmin(true);
+              renderAdmin(this.container, onNav);
+            } else {
+              this.navigate('home');
+              window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
+            }
+          }).catch(() => {
+            this.navigate('home');
+            window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
+          });
           return;
         }
         renderAdmin(this.container, onNav);

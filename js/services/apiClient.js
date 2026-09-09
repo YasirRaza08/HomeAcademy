@@ -47,7 +47,7 @@ class ApiClient {
       ...(options.headers || {})
     };
 
-    // Attach student or admin token
+    // Attach student or admin token if available (Bearer fallback)
     if (options.isAdmin && this.adminToken) {
       headers['Authorization'] = `Bearer ${this.adminToken}`;
     } else if (this.token) {
@@ -55,6 +55,7 @@ class ApiClient {
     }
 
     const config = {
+      credentials: 'include', // Send and receive HTTP-only cookies
       ...options,
       headers
     };
@@ -79,7 +80,6 @@ class ApiClient {
 
       return data;
     } catch (err) {
-      // Re-throw with descriptive context
       throw err;
     }
   }
@@ -111,10 +111,12 @@ class ApiClient {
   }
 
   async getMe() {
-    if (!this.token) return null;
     try {
       const res = await this.request('/api/auth/me');
-      return res.student;
+      if (res && res.role === 'student' && res.student) {
+        return res.student;
+      }
+      return null;
     } catch (err) {
       if (err.status === 401) {
         this.setToken(null);
@@ -134,20 +136,28 @@ class ApiClient {
   // TEACHER / ADMIN
   // ------------------------------------------------------------------------
 
-  async adminLogin(password) {
+  async adminLogin(arg1, arg2, arg3) {
+    let payload = {};
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      payload = arg1;
+    } else if (arg2 !== undefined) {
+      payload = { emailOrUsername: arg1, password: arg2, rememberMe: Boolean(arg3) };
+    } else {
+      payload = { password: arg1, rememberMe: true };
+    }
+
     const res = await this.request('/api/admin/login', {
       method: 'POST',
-      body: { password }
+      body: payload
     });
     if (res.token) this.setAdminToken(res.token);
     return res;
   }
 
   async adminGetMe() {
-    if (!this.adminToken) return false;
     try {
       const res = await this.request('/api/admin/me', { isAdmin: true });
-      return Boolean(res.authenticated);
+      return res && Boolean(res.authenticated);
     } catch (e) {
       this.setAdminToken(null);
       return false;
@@ -156,9 +166,18 @@ class ApiClient {
 
   async adminLogout() {
     try {
-      await this.request('/api/admin/logout', { method: 'POST', isAdmin: true });
+      await this.request('/api/auth/logout', { method: 'POST', isAdmin: true });
     } catch (e) {}
     this.setAdminToken(null);
+  }
+
+  async adminLogoutAll() {
+    const res = await this.request('/api/admin/security/logout-all', {
+      method: 'POST',
+      isAdmin: true
+    });
+    this.setAdminToken(null);
+    return res;
   }
 
   async adminGetRoster() {
@@ -227,12 +246,20 @@ class ApiClient {
     });
   }
 
-  async adminChangePassword(newPassword) {
-    return this.request('/api/admin/change-password', {
+  async adminChangePassword(arg1, arg2) {
+    let payload = {};
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      payload = arg1;
+    } else {
+      payload = { newPassword: arg1, currentPassword: arg2 };
+    }
+    const res = await this.request('/api/admin/security/change-password', {
       method: 'POST',
       isAdmin: true,
-      body: { newPassword }
+      body: payload
     });
+    if (res.token) this.setAdminToken(res.token);
+    return res;
   }
 
   async adminGetCurriculum() {

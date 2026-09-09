@@ -87,9 +87,16 @@ async function handleLambdaEvent(event = {}, context) {
       },
       end(data) {
         if (data) responseChunks.push(typeof data === 'string' ? data : data.toString());
+        const multiValueHeaders = {};
+        if (responseHeaders['set-cookie']) {
+          const cookieVal = responseHeaders['set-cookie'];
+          multiValueHeaders['Set-Cookie'] = Array.isArray(cookieVal) ? cookieVal : [cookieVal];
+          responseHeaders['Set-Cookie'] = Array.isArray(cookieVal) ? cookieVal[0] : cookieVal;
+        }
         resolve({
           statusCode,
           headers: responseHeaders,
+          multiValueHeaders,
           body: responseChunks.join('')
         });
       }
@@ -151,9 +158,20 @@ async function handleWebRequest(request, context) {
       },
       end(data) {
         if (data) responseChunks.push(typeof data === 'string' ? data : data.toString());
+        const webHeaders = new Headers();
+        for (const [k, v] of Object.entries(responseHeaders)) {
+          if (k.toLowerCase() === 'set-cookie') {
+            const cookieList = Array.isArray(v) ? v : [v];
+            for (const c of cookieList) {
+              webHeaders.append('Set-Cookie', c);
+            }
+          } else {
+            webHeaders.set(k, Array.isArray(v) ? v.join(', ') : v);
+          }
+        }
         resolve(new Response(responseChunks.join(''), {
           status: statusCode,
-          headers: responseHeaders
+          headers: webHeaders
         }));
       }
     };

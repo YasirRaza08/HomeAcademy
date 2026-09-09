@@ -66,13 +66,46 @@ export async function renderAdmin(container, onNavigate) {
           </p>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-outline btn-sm" id="admin-lock-btn" style="display: inline-flex; align-items: center; gap: 6px;">
-            ${lockIcon(14)} Lock Portal
-          </button>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <button class="btn btn-primary btn-sm" id="admin-switch-dash">
             View Student Dashboard →
           </button>
+
+          <!-- Professional Teacher/Admin Account Menu (Section 21) -->
+          <div style="position: relative;" id="admin-account-menu-wrapper">
+            <button id="admin-account-btn" type="button" class="btn btn-outline btn-sm"
+              style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); padding: 5px 12px; cursor: pointer;">
+              <span style="font-size: 1.1rem;">👨‍🏫</span>
+              <div style="text-align: left; line-height: 1.15;">
+                <div style="font-size: 0.82rem; font-weight: 800; color: var(--ha-navy);">${classInfo.teacher || 'Sir Zubair'}</div>
+                <div style="font-size: 0.68rem; color: var(--ha-text-muted);">Teacher / Admin</div>
+              </div>
+              <span style="font-size: 0.65rem; color: var(--ha-text-muted); margin-left: 2px;">▼</span>
+            </button>
+
+            <!-- Dropdown Popover -->
+            <div id="admin-account-dropdown" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); width: 220px; background: #ffffff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden; padding: 4px 0;">
+              <div style="padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid var(--ha-border);">
+                <div style="font-weight: 800; font-size: 0.86rem; color: var(--ha-navy); display: flex; align-items: center; gap: 6px;">
+                  <span>👤</span> ${classInfo.teacher || 'Sir Zubair'}
+                </div>
+                <div style="font-size: 0.72rem; color: var(--ha-text-muted); margin-top: 2px;">Teacher / Admin Portal</div>
+              </div>
+              <button type="button" class="admin-drop-btn" id="menu-go-security" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-navy); text-align: left;">
+                <span>⚙️</span> Security
+              </button>
+              <button type="button" class="admin-drop-btn" id="menu-go-changepass" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-navy); text-align: left;">
+                <span>🔑</span> Change Password
+              </button>
+              <div style="height: 1px; background: var(--ha-border); margin: 3px 0;"></div>
+              <button type="button" class="admin-drop-btn text-danger" id="menu-logout-all" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-red); text-align: left;">
+                <span>📱</span> Log out of all devices
+              </button>
+              <button type="button" class="admin-drop-btn text-danger" id="menu-admin-logout" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: none; background: transparent; cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--ha-red); text-align: left;">
+                <span>🚪</span> Logout
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -222,12 +255,94 @@ export async function renderAdmin(container, onNavigate) {
   // Render initial active tab
   switchTab(currentAdminTab);
 
-  // Header button handlers
-  container.querySelector('#admin-lock-btn')?.addEventListener('click', () => {
+  // Header button & dropdown handlers
+  const accountBtn = container.querySelector('#admin-account-btn');
+  const accountDropdown = container.querySelector('#admin-account-dropdown');
+
+  accountBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
     sound.playClick();
-    stateManager.setAdmin(false);
-    if (onNavigate) onNavigate('home');
+    if (accountDropdown) {
+      accountDropdown.style.display = accountDropdown.style.display === 'block' ? 'none' : 'block';
+    }
   });
+
+  document.addEventListener('click', () => {
+    if (accountDropdown) accountDropdown.style.display = 'none';
+  });
+
+  accountDropdown?.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  container.querySelector('#menu-go-security')?.addEventListener('click', () => {
+    sound.playClick();
+    if (accountDropdown) accountDropdown.style.display = 'none';
+    switchTab('security');
+  });
+
+  container.querySelector('#menu-go-changepass')?.addEventListener('click', () => {
+    sound.playClick();
+    if (accountDropdown) accountDropdown.style.display = 'none';
+    switchTab('security');
+    setTimeout(() => {
+      container.querySelector('#sec-curr-pass')?.focus();
+    }, 100);
+  });
+
+  container.querySelector('#menu-admin-logout')?.addEventListener('click', async () => {
+    sound.playClick();
+    if (accountDropdown) accountDropdown.style.display = 'none';
+    await stateManager.logoutAdmin();
+    if (onNavigate) onNavigate('home');
+    window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
+  });
+
+  container.querySelector('#menu-logout-all')?.addEventListener('click', () => {
+    sound.playClick();
+    if (accountDropdown) accountDropdown.style.display = 'none';
+    showLogoutAllModal();
+  });
+
+  function showLogoutAllModal() {
+    let modal = document.getElementById('ha-logout-all-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'ha-logout-all-modal';
+      modal.innerHTML = `
+        <div class="ha-modal-backdrop" id="logout-all-backdrop" style="position: fixed; inset: 0; background: rgba(10, 37, 88, 0.6); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+          <div class="ha-modal-dialog" style="max-width: 440px; width: 92%; background: #fff; border-radius: var(--radius-lg); padding: 26px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">📱</div>
+            <h3 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 8px; font-weight: 800;">Log out from all other devices?</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 22px; line-height: 1.45;">
+              This will revoke all active teacher sessions across all browsers and devices. You will need to log in again.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+              <button type="button" class="btn btn-outline" id="btn-cancel-logout-all" style="flex: 1; padding: 10px; font-weight: 700;">Cancel</button>
+              <button type="button" class="btn btn-secondary" id="btn-confirm-logout-all" style="flex: 1; padding: 10px; font-weight: 800; background: var(--ha-red); border-color: var(--ha-red);">Confirm Logout</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.querySelector('#btn-cancel-logout-all')?.addEventListener('click', () => {
+        modal.style.display = 'none';
+      });
+
+      modal.querySelector('#logout-all-backdrop')?.addEventListener('click', (e) => {
+        if (e.target.id === 'logout-all-backdrop') modal.style.display = 'none';
+      });
+
+      modal.querySelector('#btn-confirm-logout-all')?.addEventListener('click', async () => {
+        modal.style.display = 'none';
+        await stateManager.logoutAdminAllDevices();
+        if (onNavigate) onNavigate('home');
+        window.dispatchEvent(new CustomEvent('ha:open-join-modal', { detail: 'teacher' }));
+      });
+    }
+    modal.style.display = 'block';
+  }
 
   container.querySelector('#admin-switch-dash')?.addEventListener('click', () => {
     sound.playClick();
@@ -1131,50 +1246,170 @@ function renderSettingsTab(mount, classInfo) {
 // --------------------------------------------------------------------------
 function renderSecurityTab(mount) {
   mount.innerHTML = `
-    <div class="ha-card" style="padding: 24px; max-width: 600px; border-top: 4px solid var(--ha-red);">
-      <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 6px;">Faculty Security & Password</h2>
-      <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 20px;">
-        Update the Teacher Portal password. Changes are verified and hashed server-side.
-      </p>
+    <div style="display: flex; flex-direction: column; gap: 20px; max-width: 620px;">
+      
+      <!-- Card 1: Change Password -->
+      <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-red);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 1.3rem;">🔑</span>
+          <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Change Teacher Password</h2>
+        </div>
+        <p style="font-size: 0.86rem; color: var(--ha-text-muted); margin: 0 0 18px;">
+          Update the Teacher Portal password. Current password verification and bcrypt hashing (cost 10) are enforced server-side.
+        </p>
 
-      <form id="form-admin-password" style="display: flex; flex-direction: column; gap: 14px;">
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">CURRENT PASSWORD</label>
-          <input type="password" id="sec-curr-pass" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+        <div id="sec-feedback-success" style="display: none; padding: 11px 14px; background: rgba(34, 197, 94, 0.12); color: #166534; border-radius: var(--radius-sm); font-size: 0.86rem; font-weight: 700; border-left: 4px solid #22c55e; margin-bottom: 14px;">
+          ✓ Your password has been changed successfully.
         </div>
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">NEW PASSWORD (Min 6 chars)</label>
-          <input type="password" id="sec-new-pass" minlength="6" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+
+        <div id="sec-feedback-error" style="display: none; padding: 11px 14px; background: var(--ha-red-light); color: var(--ha-red); border-radius: var(--radius-sm); font-size: 0.86rem; font-weight: 700; border-left: 4px solid var(--ha-red); margin-bottom: 14px;"></div>
+
+        <form id="form-admin-password" style="display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label for="sec-curr-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              CURRENT PASSWORD *
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-curr-pass" required autocomplete="current-password"
+                placeholder="Enter current teacher password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-curr-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                👁️
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="sec-new-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              NEW PASSWORD * (Minimum 6 characters)
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-new-pass" minlength="6" required autocomplete="new-password"
+                placeholder="Create new secure password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-new-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                👁️
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="sec-conf-pass" style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+              CONFIRM NEW PASSWORD *
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="sec-conf-pass" minlength="6" required autocomplete="new-password"
+                placeholder="Re-enter new password"
+                style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none;" />
+              <button type="button" class="toggle-pass-inline" data-target="sec-conf-pass"
+                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;">
+                👁️
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" id="btn-submit-change-pass" class="btn btn-secondary" style="background: var(--ha-red); border-color: var(--ha-red); margin-top: 6px; padding: 11px; font-weight: 800;">
+            Change Password
+          </button>
+        </form>
+      </div>
+
+      <!-- Card 2: Active Sessions & Multi-Device Security -->
+      <div class="ha-card" style="padding: 22px; border-top: 4px solid var(--ha-navy);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span style="font-size: 1.3rem;">📱</span>
+          <h2 style="font-size: 1.15rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Session & Device Management</h2>
         </div>
-        <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">CONFIRM NEW PASSWORD</label>
-          <input type="password" id="sec-conf-pass" minlength="6" required style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md);" />
+        <p style="font-size: 0.85rem; color: var(--ha-text-muted); margin: 0 0 16px; line-height: 1.4;">
+          Your login session is securely maintained with persistent HTTP-only cookies in Turso Cloud. If you used other devices, you can revoke them here.
+        </p>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-outline" id="btn-sec-logout-all" style="border-color: var(--ha-red); color: var(--ha-red); font-weight: 700;">
+            <span>📱</span> Log out of all devices
+          </button>
         </div>
-        <button type="submit" class="btn btn-secondary" style="background: var(--ha-red); border-color: var(--ha-red); margin-top: 8px;">Change Password</button>
-      </form>
+      </div>
+
     </div>
   `;
 
+  // Password visibility toggle helpers
+  mount.querySelectorAll('.toggle-pass-inline').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetInput = mount.querySelector(`#${btn.dataset.target}`);
+      if (targetInput) {
+        if (targetInput.type === 'password') {
+          targetInput.type = 'text';
+          btn.textContent = '🙈';
+        } else {
+          targetInput.type = 'password';
+          btn.textContent = '👁️';
+        }
+      }
+    });
+  });
+
+  // Change password form submission
   mount.querySelector('#form-admin-password')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const currentPassword = mount.querySelector('#sec-curr-pass').value;
-    const newPassword = mount.querySelector('#sec-new-pass').value;
-    const confirmPassword = mount.querySelector('#sec-conf-pass').value;
+    const currInput = mount.querySelector('#sec-curr-pass');
+    const newInput = mount.querySelector('#sec-new-pass');
+    const confInput = mount.querySelector('#sec-conf-pass');
+    const successBox = mount.querySelector('#sec-feedback-success');
+    const errorBox = mount.querySelector('#sec-feedback-error');
+    const submitBtn = mount.querySelector('#btn-submit-change-pass');
+
+    if (successBox) successBox.style.display = 'none';
+    if (errorBox) errorBox.style.display = 'none';
+
+    const currentPassword = currInput?.value;
+    const newPassword = newInput?.value;
+    const confirmPassword = confInput?.value;
 
     if (newPassword !== confirmPassword) {
-      return alert('New passwords do not match. Please re-enter.');
+      if (errorBox) {
+        errorBox.textContent = 'New passwords do not match. Please re-enter.';
+        errorBox.style.display = 'block';
+      }
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳</span> Changing password...';
     }
 
     try {
-      await apiClient.adminChangePassword(newPassword);
-      stateManager.updateTeacherPassword(currentPassword, newPassword);
+      await stateManager.updateTeacherPassword(currentPassword, newPassword, confirmPassword);
       sound.playSuccess();
-      alert('Teacher password updated successfully!');
-      mount.querySelector('#sec-curr-pass').value = '';
-      mount.querySelector('#sec-new-pass').value = '';
-      mount.querySelector('#sec-conf-pass').value = '';
+      if (successBox) {
+        successBox.textContent = 'Your password has been changed successfully.';
+        successBox.style.display = 'block';
+      }
+      if (currInput) currInput.value = '';
+      if (newInput) newInput.value = '';
+      if (confInput) confInput.value = '';
     } catch (err) {
-      alert(err.message);
+      sound.playWrong();
+      if (errorBox) {
+        errorBox.textContent = err.message || 'Failed to change password.';
+        errorBox.style.display = 'block';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Change Password';
+      }
     }
+  });
+
+  // Log out of all devices button
+  mount.querySelector('#btn-sec-logout-all')?.addEventListener('click', () => {
+    sound.playClick();
+    const trigger = document.getElementById('menu-logout-all');
+    if (trigger) trigger.click();
   });
 }

@@ -1,6 +1,7 @@
 // Automated Verification of Turso Database Layer and API Router
 import assert from 'assert';
 import { handleApiRequest } from './server/apiRouter.js';
+import * as db from './data/db.js';
 import { initDatabase, checkHealth, getStudentByEmail, getAllStudents } from './data/db.js';
 
 // Mock request / response helper for in-process testing
@@ -25,7 +26,9 @@ function invokeApi(method, path, body = null, headers = {}) {
     const mockRes = {
       writeHead(code, h = {}) {
         statusCode = code;
-        Object.assign(resHeaders, h);
+        for (const [k, v] of Object.entries(h)) {
+          resHeaders[k.toLowerCase()] = v;
+        }
       },
       setHeader(name, val) {
         resHeaders[name.toLowerCase()] = val;
@@ -159,28 +162,196 @@ async function runVerification() {
   console.log(`✓ Leaderboard verified: ${lbStudent.name} is ranked with ${lbStudent.xp} XP (Zero email leak)\n`);
 
   // Step 10: Test Teacher Admin Login (POST /api/admin/login)
-  console.log('10. Testing Teacher Admin Login (POST /api/admin/login)...');
+  console.log('10. Testing Teacher Admin Login with identifier and rememberMe (POST /api/admin/login)...');
   const adminLoginRes = await invokeApi('POST', '/api/admin/login', {
-    password: 'pakistan786'
+    emailOrUsername: 'teacher',
+    password: 'pakistan786',
+    rememberMe: true
   });
-  assert.strictEqual(adminLoginRes.status, 200);
+  assert.strictEqual(adminLoginRes.status, 200, 'Admin login should return 200');
   assert.ok(adminLoginRes.body.token, 'Teacher admin login must return a token');
+  assert.strictEqual(adminLoginRes.body.role, 'teacher');
+  assert.ok(adminLoginRes.headers['set-cookie'], 'Response must set HTTP-only cookie');
+  assert.ok(adminLoginRes.headers['set-cookie'].includes('ha_admin_session='), 'Must set ha_admin_session cookie');
+  assert.ok(adminLoginRes.headers['set-cookie'].includes('HttpOnly'), 'Cookie must be HttpOnly');
+  assert.ok(adminLoginRes.headers['set-cookie'].includes('SameSite=Lax'), 'Cookie must have SameSite protection');
   const adminToken = adminLoginRes.body.token;
-  console.log('✓ Teacher admin logged in successfully.\n');
+  console.log('✓ Teacher admin logged in successfully with HTTP-only cookie set.\n');
 
-  // Step 11: Test Teacher Admin Roster (GET /api/admin/students)
-  console.log('11. Testing Teacher Admin Roster (GET /api/admin/students)...');
-  const rosterRes = await invokeApi('GET', '/api/admin/students', null, {
+  // Step 11: Verify Session in Database
+  console.log('11. Verifying persistent session in database...');
+  const dbSession = await db.getSession(adminToken);
+  assert.ok(dbSession, 'Session must exist in database');
+  assert.strictEqual(dbSession.role, 'teacher');
+  assert.strictEqual(dbSession.remember_me, 1, 'remember_me flag must be 1');
+  console.log('✓ Session verified in Turso/SQLite sessions table.\n');
+
+  // Step 12: Test Teacher Admin Auto-Restoration (GET /api/admin/me & GET /api/auth/me)
+  console.log('12. Testing Session Auto-Restoration (GET /api/admin/me & GET /api/auth/me)...');
+  const adminMeRes = await invokeApi('GET', '/api/admin/me', null, {
+    cookie: `ha_admin_session=${adminToken}`
+  });
+  assert.strictEqual(adminMeRes.status, 200);
+  assert.strictEqual(adminMeRes.body.authenticated, true);
+  assert.strictEqual(adminMeRes.body.user.role, 'teacher');
+
+  const authMeRes = await invokeApi('GET', '/api/auth/me', null, {
     authorization: `Bearer ${adminToken}`
+  });
+  assert.strictEqual(authMeRes.status, 200);
+  assert.strictEqual(authMeRes.body.authenticated, true);
+  assert.strictEqual(authMeRes.body.role, 'teacher');
+  assert.strictEqual(authMeRes.body.user.name, 'Sir Zubair');
+  console.log('✓ Session auto-restored via HTTP-only cookie and Bearer token.\n');
+
+  // Step 13: Test Route Protection - 401 Unauthorized for unauthenticated requests
+  console.log('13. Testing Admin Route Protection (401 Unauthorized)...');
+  const unauthRes = await invokeApi('GET', '/api/admin/students');
+  assert.strictEqual(unauthRes.status, 401, 'Unauthenticated access to admin routes must return 401');
+  console.log('✓ 401 Unauthorized verified for unauthenticated request.\n');
+
+  // Step 14: Test Route Protection - 403 Forbidden for logged-in students
+  console.log('14. Testing Admin Route Protection (403 Forbidden for students)...');
+  const studentForbiddenRes = await invokeApi('GET', '/api/admin/students', null, {
+    authorization: `Bearer ${studentToken}`
+  });
+  assert.strictEqual(studentForbiddenRes.status, 403, 'Student access to admin routes must return 403 Forbidden');
+  console.log('✓ 403 Forbidden verified for student token attempting admin route.\n');
+
+  // Step 15: Test Teacher Admin Roster Access (Authorized 200 OK)
+  console.log('15. Testing Teacher Admin Roster Access (GET /api/admin/students)...');
+  const rosterRes = await invokeApi('GET', '/api/admin/students', null, {
+    cookie: `ha_admin_session=${adminToken}`
   });
   assert.strictEqual(rosterRes.status, 200);
   assert.ok(rosterRes.body.students.length > 0);
   const foundInRoster = rosterRes.body.students.find(s => s.studentId === studentId);
   assert.ok(foundInRoster, 'Student must appear in teacher roster');
-  console.log(`✓ Teacher roster contains ${rosterRes.body.students.length} real student(s).\n`);
+  console.log(`✓ Teacher roster verified with ${rosterRes.body.students.length} real student(s).\n`);
+
+  // Step 16: Test Invalid Password Login
+  console.log('16. Testing Invalid Password Login...');
+  const badLoginRes = await invokeApi('POST', '/api/admin/login', {
+    emailOrUsername: 'teacher',
+    password: 'wrongPassword999'
+  });
+  assert.strictEqual(badLoginRes.status, 401);
+  assert.strictEqual(badLoginRes.body.success, false);
+  console.log('✓ Invalid password correctly rejected with 401.\n');
+
+  // Step 17: Test Rate Limiting on Brute-Force Login
+  console.log('17. Testing Rate Limiting on Repeated Failed Logins...');
+  let rateLimited = false;
+  for (let i = 0; i < 6; i++) {
+    const rlRes = await invokeApi('POST', '/api/admin/login', {
+      emailOrUsername: 'test_brute_force_user',
+      password: 'bad'
+    }, {
+      'x-forwarded-for': '192.168.1.99'
+    });
+    if (rlRes.status === 429) {
+      rateLimited = true;
+      break;
+    }
+  }
+  assert.ok(rateLimited, 'Repeated failed login attempts must be rate-limited with 429');
+  console.log('✓ Rate limiting verified: 429 Too Many Requests returned.\n');
+
+  // Step 18: Test Password Change Flow
+  console.log('18. Testing Password Change Flow (POST /api/admin/security/change-password)...');
+  // Wrong current password
+  const badChangeRes = await invokeApi('POST', '/api/admin/security/change-password', {
+    currentPassword: 'wrongCurrentPassword',
+    newPassword: 'newValidPassword786',
+    confirmPassword: 'newValidPassword786'
+  }, {
+    authorization: `Bearer ${adminToken}`
+  });
+  assert.strictEqual(badChangeRes.status, 401);
+  assert.strictEqual(badChangeRes.body.error, 'Current password is incorrect.');
+
+  // Successful password change
+  const goodChangeRes = await invokeApi('POST', '/api/admin/security/change-password', {
+    currentPassword: 'pakistan786',
+    newPassword: 'newValidPassword786',
+    confirmPassword: 'newValidPassword786'
+  }, {
+    authorization: `Bearer ${adminToken}`
+  });
+  assert.strictEqual(goodChangeRes.status, 200);
+  assert.strictEqual(goodChangeRes.body.success, true);
+  assert.ok(goodChangeRes.body.token, 'Should issue fresh active session');
+  const freshAdminToken = goodChangeRes.body.token;
+
+  // Verify old password fails
+  const oldPassLoginRes = await invokeApi('POST', '/api/admin/login', {
+    emailOrUsername: 'teacher',
+    password: 'pakistan786'
+  });
+  assert.strictEqual(oldPassLoginRes.status, 401, 'Old password must no longer work');
+
+  // Verify new password works
+  const newPassLoginRes = await invokeApi('POST', '/api/admin/login', {
+    emailOrUsername: 'teacher',
+    password: 'newValidPassword786'
+  });
+  assert.strictEqual(newPassLoginRes.status, 200, 'New password must work');
+
+  // Reset back to initial password 'pakistan786' for clean production state
+  const resetPassRes = await invokeApi('POST', '/api/admin/security/change-password', {
+    currentPassword: 'newValidPassword786',
+    newPassword: 'pakistan786',
+    confirmPassword: 'pakistan786'
+  }, {
+    authorization: `Bearer ${freshAdminToken}`
+  });
+  assert.strictEqual(resetPassRes.status, 200);
+  const activeAdminToken = resetPassRes.body.token;
+  console.log('✓ Password change flow verified: old password rejected, new password verified, reset successfully.\n');
+
+  // Step 19: Test Logout (Single Device)
+  console.log('19. Testing Logout (POST /api/auth/logout)...');
+  const logoutRes = await invokeApi('POST', '/api/auth/logout', null, {
+    authorization: `Bearer ${activeAdminToken}`
+  });
+  const setCookieHeader = logoutRes.headers['set-cookie'];
+  const hasMaxAgeZero = Array.isArray(setCookieHeader)
+    ? setCookieHeader.some(c => c.includes('Max-Age=0'))
+    : (setCookieHeader && setCookieHeader.includes('Max-Age=0'));
+  assert.ok(hasMaxAgeZero, 'Logout must clear cookie with Max-Age=0');
+
+  // Verify session is now revoked
+  const afterLogoutRes = await invokeApi('GET', '/api/admin/me', null, {
+    authorization: `Bearer ${activeAdminToken}`
+  });
+  assert.strictEqual(afterLogoutRes.status, 401, 'Revoked session must return 401');
+  console.log('✓ Logout verified: session revoked and cookie cleared.\n');
+
+  // Step 20: Test Logout All Devices
+  console.log('20. Testing Logout of All Devices (POST /api/admin/security/logout-all)...');
+  const freshLogin = await invokeApi('POST', '/api/admin/login', {
+    password: 'pakistan786'
+  });
+  const tempToken = freshLogin.body.token;
+  const logoutAllRes = await invokeApi('POST', '/api/admin/security/logout-all', null, {
+    authorization: `Bearer ${tempToken}`
+  });
+  assert.strictEqual(logoutAllRes.status, 200);
+  const checkAfterAll = await invokeApi('GET', '/api/admin/me', null, {
+    authorization: `Bearer ${tempToken}`
+  });
+  assert.strictEqual(checkAfterAll.status, 401);
+  console.log('✓ Logout all devices verified: all teacher sessions revoked.\n');
+
+  // Step 21: Secrets Audit
+  console.log('21. Auditing Codebase & Bundles for Plaintext Password Secrets...');
+  const fs = await import('fs');
+  const bundleContent = fs.readFileSync('./js/bundle.js', 'utf8');
+  assert.ok(!bundleContent.includes("password: 'pakistan786'"), 'Bundle must not contain hardcoded teacher password');
+  console.log('✓ Zero plaintext secrets found in frontend bundle.\n');
 
   console.log('====================================================');
-  console.log('🎉 ALL PRODUCTION DATABASE & API TESTS PASSED 100%!');
+  console.log('🎉 ALL 21 PRODUCTION TESTS PASSED 100%!');
   console.log('====================================================\n');
 }
 

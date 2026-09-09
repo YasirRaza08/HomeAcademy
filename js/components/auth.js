@@ -130,21 +130,36 @@ export function setupAuthModal(modalContainer, onStudentJoined) {
                     </div>
                   </div>
 
-                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 14px;">
+                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 12px;">
                     <div>
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <label for="teacher-side-password" style="font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
+                      <label for="teacher-side-identifier" style="display: block; font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
+                        TEACHER USERNAME OR EMAIL *
+                      </label>
+                      <input type="text" id="teacher-side-identifier" placeholder="e.g. teacher or teacher@homeacademy.com" value="teacher" required autocomplete="username"
+                        style="width: 100%; padding: 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                    </div>
+
+                    <div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label for="teacher-side-password" style="font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
                           TEACHER PASSWORD *
                         </label>
                       </div>
                       <div style="position: relative;">
                         <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password"
-                          style="width: 100%; padding: 12px 38px 12px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.95rem; outline: none; background: #fff;" />
+                          style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
                         <button type="button" class="toggle-password-btn" data-target="teacher-side-password"
                           style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
                           👁️
                         </button>
                       </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--ha-text-muted);">
+                      <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="teacher-side-remember" checked style="accent-color: var(--ha-red); width: 15px; height: 15px; cursor: pointer;" />
+                        <span>Keep me logged in (30 days)</span>
+                      </label>
                     </div>
 
                     <div id="teacher-side-error" style="display: none; padding: 9px 12px; background: var(--ha-red-light); color: var(--ha-red); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700; border-left: 3px solid var(--ha-red);"></div>
@@ -381,26 +396,37 @@ export function setupAuthModal(modalContainer, onStudentJoined) {
       }
     });
 
-    // 2. RIGHT — Teacher Portal Form (Password only)
+    // 2. RIGHT — Teacher Portal Form (Real Server Authentication)
     const teacherForm = modalContainer.querySelector('#teacher-side-login-form');
-    teacherForm?.addEventListener('submit', (e) => {
+    teacherForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const identifier = modalContainer.querySelector('#teacher-side-identifier')?.value?.trim();
       const password = modalContainer.querySelector('#teacher-side-password')?.value;
+      const rememberMe = modalContainer.querySelector('#teacher-side-remember')?.checked;
       const errorMsg = modalContainer.querySelector('#teacher-side-error');
       const submitBtn = modalContainer.querySelector('#teacher-side-submit-btn');
 
       if (errorMsg) errorMsg.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳</span> Verifying credentials...';
+      }
 
       try {
-        stateManager.verifyTeacherLogin(password);
+        await stateManager.verifyTeacherLogin({ identifier, password, rememberMe });
         sound.playCorrect();
         closeModal();
         window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
       } catch (err) {
         sound.playWrong();
         if (errorMsg) {
-          errorMsg.textContent = err.message || 'Incorrect teacher password.';
+          errorMsg.textContent = err.message || 'Incorrect password. Please try again.';
           errorMsg.style.display = 'block';
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'TEACHER LOGIN';
         }
       }
     });

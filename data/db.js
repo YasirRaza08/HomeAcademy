@@ -203,7 +203,10 @@ export async function initDatabase() {
       student_id TEXT REFERENCES students(student_id) ON DELETE CASCADE,
       role TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME
+      expires_at DATETIME,
+      last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      revoked_at DATETIME,
+      remember_me INTEGER DEFAULT 0
     );`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_sessions_student ON sessions(student_id);`,
@@ -397,6 +400,23 @@ export async function initDatabase() {
   for (const stmt of ddlStatements) {
     await activeClient.execute(stmt);
   }
+
+  // Idempotent column migrations for sessions table in existing databases
+  const sessionColumnMigrations = [
+    `ALTER TABLE sessions ADD COLUMN last_activity_at DATETIME;`,
+    `ALTER TABLE sessions ADD COLUMN revoked_at DATETIME;`,
+    `ALTER TABLE sessions ADD COLUMN remember_me INTEGER DEFAULT 0;`
+  ];
+  for (const colStmt of sessionColumnMigrations) {
+    try {
+      await activeClient.execute(colStmt);
+    } catch (e) {
+      // Ignored if column already exists
+    }
+  }
+  try {
+    await activeClient.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_revoked ON sessions(revoked_at, expires_at);`);
+  } catch (e) {}
 
   await seedInitialDataIfEmpty();
 }
@@ -1241,17 +1261,26 @@ export async function markNotificationsAsRead(recipientRole = 'teacher') {
 }
 
 // --------------------------------------------------------------------------
-// SESSIONS & AUTHENTICATION
+// SESSIONS & AUTHENTICATION (TURSO CLOUD PERSISTENCE)
 // --------------------------------------------------------------------------
-export async function createSession(userId, studentId = null, role = 'student', expiryHours = 72) {
+export async function createSession(userId, studentId = null, role = 'student', expiryHours = 72, rememberMe = 0) {
   const activeClient = getClient();
-  const token = 'ha_tok_' + crypto.randomBytes(32).toString('hex');
+  const token = 'ha_sess_' + crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + expiryHours * 3600000).toISOString();
+  const remValue = rememberMe ? 1 : 0;
   await activeClient.execute({
-    sql: `INSERT INTO sessions (token, user_id, student_id, role, expires_at) VALUES (?, ?, ?, ?, ?)`,
-    args: [token, userId, studentId, role, expiresAt]
+    sql: `INSERT INTO sessions (token, user_id, student_id, role, expires_at, last_activity_at, remember_me) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+    args: [token, userId, studentId, role, expiresAt, remValue]
   });
   return token;
+}
+
+export async function createTeacherSession(userId, rememberMe = false) {
+  const expiryHours = rememberMe ? 24 * 30 : 24; // 30 days vs 24 hours
+  const token = await createSession(userId, null, 'teacher', expiryHours, rememberMe ? 1 : 0);
+  const maxAgeSeconds = expiryHours * 3600;
+  const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000).toISOString();
+  return { token, expiresAt, maxAgeSeconds, role: 'teacher' };
 }
 
 export async function getSession(token) {
@@ -1263,10 +1292,24 @@ export async function getSession(token) {
   });
   const session = res.rows[0];
   if (!session) return null;
+
+  // Check if session has been revoked
+  if (session.revoked_at) {
+    return null;
+  }
+
+  // Check expiration
   if (session.expires_at && new Date(session.expires_at) < new Date()) {
     await activeClient.execute({ sql: `DELETE FROM sessions WHERE token = ?`, args: [token] });
     return null;
   }
+
+  // Throttled update of last_activity_at in background
+  activeClient.execute({
+    sql: `UPDATE sessions SET last_activity_at = CURRENT_TIMESTAMP WHERE token = ?`,
+    args: [token]
+  }).catch(() => {});
+
   return session;
 }
 
@@ -1279,24 +1322,95 @@ export async function deleteSession(token) {
   });
 }
 
-export async function verifyTeacherPassword(password) {
+export async function revokeAllTeacherSessions(userId = null, exceptToken = null) {
   const activeClient = getClient();
-  const res = await activeClient.execute(`SELECT * FROM users WHERE role = 'teacher' LIMIT 1`);
-  const user = res.rows[0];
-  if (!user) return false;
-  return verifyPasswordServer(password, user.password_hash, user.password_salt);
+  let sql = `DELETE FROM sessions WHERE role IN ('teacher', 'admin')`;
+  const args = [];
+  if (exceptToken) {
+    sql += ` AND token != ?`;
+    args.push(exceptToken);
+  }
+  await activeClient.execute({ sql, args });
+  return true;
 }
 
-export async function updateTeacherPassword(newPassword) {
+export async function verifyTeacherCredentials(identifier, password) {
+  if (!password) return null;
   const activeClient = getClient();
+  const cleanPass = password.trim();
+
+  // Retrieve teacher accounts
+  const res = await activeClient.execute(
+    `SELECT u.user_id, u.role, u.email, u.password_hash, u.password_salt, t.name as teacher_name
+     FROM users u
+     LEFT JOIN teachers_admins t ON u.user_id = t.user_id
+     WHERE u.role IN ('teacher', 'admin')`
+  );
+
+  if (!res.rows || res.rows.length === 0) return null;
+
+  let candidate = null;
+  if (identifier && identifier.trim()) {
+    const idClean = identifier.trim().toLowerCase();
+    candidate = res.rows.find(r => 
+      (r.email && r.email.toLowerCase() === idClean) ||
+      (r.teacher_name && r.teacher_name.toLowerCase() === idClean) ||
+      (idClean === 'teacher') ||
+      (idClean === 'admin') ||
+      (idClean === 'zubair') ||
+      (idClean === 'sir zubair') ||
+      (r.user_id && r.user_id.toLowerCase() === idClean)
+    );
+  }
+
+  // Fallback to first teacher account if no specific identifier or identifier matched default
+  if (!candidate) {
+    candidate = res.rows[0];
+  }
+
+  const isValid = verifyPasswordServer(cleanPass, candidate.password_hash, candidate.password_salt);
+  if (!isValid) return null;
+
+  // Update last_login timestamp
+  activeClient.execute({
+    sql: `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?`,
+    args: [candidate.user_id]
+  }).catch(() => {});
+
+  return {
+    userId: candidate.user_id,
+    role: candidate.role,
+    email: candidate.email,
+    name: candidate.teacher_name || 'Sir Zubair'
+  };
+}
+
+export async function verifyTeacherPassword(password) {
+  const creds = await verifyTeacherCredentials(null, password);
+  return Boolean(creds);
+}
+
+export async function updateTeacherPassword(newPassword, currentPassword = null) {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('New teacher password must be at least 6 characters long.');
+  }
+
+  const activeClient = getClient();
+  if (currentPassword) {
+    const valid = await verifyTeacherPassword(currentPassword);
+    if (!valid) {
+      throw new Error('Current password is incorrect.');
+    }
+  }
+
   const hash = hashPasswordServer(newPassword);
   await activeClient.batch([
     {
-      sql: `UPDATE users SET password_salt = 'bcrypt', password_hash = ? WHERE role = 'teacher'`,
+      sql: `UPDATE users SET password_salt = 'bcrypt', password_hash = ? WHERE role IN ('teacher', 'admin')`,
       args: [hash]
     },
     {
-      sql: `DELETE FROM sessions WHERE role = 'teacher'`,
+      sql: `DELETE FROM sessions WHERE role IN ('teacher', 'admin')`,
       args: []
     }
   ], 'write');
