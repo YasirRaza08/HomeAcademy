@@ -149,6 +149,20 @@ export function calculateLevel(xp = 0) {
 // --------------------------------------------------------------------------
 export async function initDatabase() {
   const activeClient = getClient();
+
+  // Fast check: if core tables exist, avoid running 150 DDL and seed statements sequentially
+  try {
+    const existingTablesRes = await activeClient.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'messages', 'curriculum_topics')"
+    );
+    const existingNames = new Set(existingTablesRes.rows.map(r => r.name));
+
+    if (existingNames.has('users') && existingNames.has('messages') && existingNames.has('curriculum_topics')) {
+      await ensureTeacherAccountSynchronized(activeClient);
+      return;
+    }
+  } catch (e) {}
+
   const ddlStatements = [
     // 1. Users
     `CREATE TABLE IF NOT EXISTS users (
@@ -444,42 +458,58 @@ export async function initDatabase() {
   await seedInitialDataIfEmpty();
 }
 
+async function ensureTeacherAccountSynchronized(activeClient) {
+  const initialTeacherPassword = process.env.INITIAL_ADMIN_PASSWORD || 'pakistan786';
+  const teacherUserId = 'usr_teacher_zubair';
+
+  try {
+    const existingTeachers = await activeClient.execute(
+      `SELECT user_id, password_hash, password_salt FROM users WHERE role IN ('teacher', 'admin')`
+    );
+
+    let hasValidPassword = false;
+    if (existingTeachers.rows && existingTeachers.rows.length > 0) {
+      for (const row of existingTeachers.rows) {
+        if (verifyPasswordServer(initialTeacherPassword, row.password_hash, row.password_salt)) {
+          hasValidPassword = true;
+          break;
+        }
+      }
+    }
+
+    if (!hasValidPassword) {
+      const adminHash = hashPasswordServer(initialTeacherPassword);
+      console.log('[Home Academy] Synchronizing teacher password to master password.');
+      await activeClient.execute({
+        sql: `INSERT INTO users (user_id, role, email, password_hash, password_salt)
+              VALUES (?, 'teacher', 'teacher@homeacademy.com', ?, 'bcrypt')
+              ON CONFLICT(user_id) DO UPDATE SET password_hash = excluded.password_hash, password_salt = 'bcrypt'`,
+        args: [teacherUserId, adminHash]
+      }).catch(async () => {
+        await activeClient.execute({
+          sql: `UPDATE users SET password_hash = ?, password_salt = 'bcrypt' WHERE role IN ('teacher', 'admin')`,
+          args: [adminHash]
+        });
+      });
+
+      await activeClient.execute({
+        sql: `INSERT OR IGNORE INTO teachers_admins (teacher_id, user_id, name, email) VALUES ('tch_zubair', ?, 'Sir Zubair', 'teacher@homeacademy.com')`,
+        args: [teacherUserId]
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn('[Home Academy] Teacher account sync notice:', err.message);
+  }
+}
+
 // --------------------------------------------------------------------------
 // SYSTEM SEEDING (ZERO FAKE STUDENTS, REAL CONTENT ONLY)
 // --------------------------------------------------------------------------
 async function seedInitialDataIfEmpty() {
   const activeClient = getClient();
-  const initialTeacherPassword = process.env.INITIAL_ADMIN_PASSWORD || 'pakistan786';
-  const adminHash = hashPasswordServer(initialTeacherPassword);
   const teacherUserId = 'usr_teacher_zubair';
 
-  // 1. Ensure Teacher Account exists and has valid password hash
-  const existingTeachers = await activeClient.execute(
-    `SELECT user_id, password_hash, password_salt FROM users WHERE role IN ('teacher', 'admin')`
-  );
-
-  if (!existingTeachers.rows || existingTeachers.rows.length === 0) {
-    await activeClient.execute({
-      sql: `INSERT INTO users (user_id, role, email, password_hash, password_salt) VALUES (?, 'teacher', 'teacher@homeacademy.com', ?, 'bcrypt')`,
-      args: [teacherUserId, adminHash]
-    });
-  } else {
-    // Verify if any teacher account has a valid hash for initialTeacherPassword
-    let hasValidPassword = false;
-    for (const row of existingTeachers.rows) {
-      if (verifyPasswordServer(initialTeacherPassword, row.password_hash, row.password_salt)) {
-        hasValidPassword = true;
-        break;
-      }
-    }
-    if (!hasValidPassword) {
-      console.log('[Home Academy] Updating teacher accounts with verified password hash.');
-      await activeClient.execute({
-        sql: `UPDATE users SET password_hash = ?, password_salt = 'bcrypt' WHERE role IN ('teacher', 'admin')`,
-        args: [adminHash]
-      });
-    }
-  }
+  await ensureTeacherAccountSynchronized(activeClient);
 
   await activeClient.execute({
     sql: `INSERT OR IGNORE INTO classes (class_id, code, name, teacher_id) VALUES ('cls_home_english', 'HOME-ENGLISH', 'Home Academy - English Language Program', 'tch_zubair')`,
