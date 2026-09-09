@@ -394,7 +394,23 @@ export async function initDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );`
+    );`,
+
+    // 19. Student ↔ Teacher Messages / Chat Box
+    `CREATE TABLE IF NOT EXISTS messages (
+      message_id TEXT PRIMARY KEY,
+      sender_role TEXT NOT NULL DEFAULT 'student',
+      sender_name TEXT NOT NULL,
+      student_id TEXT,
+      student_email TEXT,
+      content TEXT NOT NULL,
+      reply_text TEXT,
+      reply_at DATETIME,
+      is_read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_messages_time ON messages(created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_messages_student ON messages(student_id);`
   ];
 
   for (const stmt of ddlStatements) {
@@ -1649,4 +1665,77 @@ export async function resetRoleplays() {
     });
   }
   return getRoleplays(true);
+}
+
+// --------------------------------------------------------------------------
+// 20. STUDENT ↔ TEACHER CHAT BOX (MESSAGES)
+// --------------------------------------------------------------------------
+export async function createChatMessage({ senderRole = 'student', senderName, studentId = null, studentEmail = null, content }) {
+  if (!content || !content.trim()) throw new Error('Message content cannot be empty.');
+  const activeClient = getClient();
+  const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  const cleanName = (senderName || 'Student').trim();
+  const cleanContent = content.trim();
+
+  await activeClient.execute({
+    sql: `INSERT INTO messages (message_id, sender_role, sender_name, student_id, student_email, content, is_read)
+          VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    args: [messageId, senderRole, cleanName, studentId, studentEmail, cleanContent]
+  });
+
+  return {
+    messageId,
+    senderRole,
+    senderName: cleanName,
+    studentId,
+    studentEmail,
+    content: cleanContent,
+    replyText: null,
+    replyAt: null,
+    isRead: 0,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export async function getChatMessages(limit = 60) {
+  const activeClient = getClient();
+  const res = await activeClient.execute({
+    sql: `SELECT * FROM messages ORDER BY created_at ASC LIMIT ?`,
+    args: [parseInt(limit, 10) || 60]
+  });
+
+  return res.rows.map(r => ({
+    messageId: r.message_id,
+    senderRole: r.sender_role,
+    senderName: r.sender_name,
+    studentId: r.student_id,
+    studentEmail: r.student_email,
+    content: r.content,
+    replyText: r.reply_text,
+    replyAt: r.reply_at,
+    isRead: Number(r.is_read || 0),
+    createdAt: r.created_at
+  }));
+}
+
+export async function replyChatMessage(messageId, replyText) {
+  if (!messageId || !replyText || !replyText.trim()) {
+    throw new Error('Message ID and reply text are required.');
+  }
+  const activeClient = getClient();
+  const now = new Date().toISOString();
+  await activeClient.execute({
+    sql: `UPDATE messages SET reply_text = ?, reply_at = ?, is_read = 1 WHERE message_id = ?`,
+    args: [replyText.trim(), now, messageId]
+  });
+  return true;
+}
+
+export async function deleteChatMessage(messageId) {
+  const activeClient = getClient();
+  await activeClient.execute({
+    sql: `DELETE FROM messages WHERE message_id = ?`,
+    args: [messageId]
+  });
+  return true;
 }

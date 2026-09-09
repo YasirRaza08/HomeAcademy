@@ -378,6 +378,37 @@ class ApiClient {
   }
 
   // ------------------------------------------------------------------------
+  // STUDENT ↔ TEACHER CHAT (MESSAGES)
+  // ------------------------------------------------------------------------
+  async getChatMessages() {
+    return this.request('/api/messages');
+  }
+
+  async sendChatMessage({ senderName, content, studentId, studentEmail }) {
+    return this.request('/api/messages', {
+      method: 'POST',
+      body: { senderName, content, studentId, studentEmail }
+    });
+  }
+
+  async adminGetMessages() {
+    return this.request('/api/admin/messages');
+  }
+
+  async adminReplyMessage(messageId, replyText) {
+    return this.request('/api/admin/messages/reply', {
+      method: 'POST',
+      body: { messageId, replyText }
+    });
+  }
+
+  async adminDeleteMessage(messageId) {
+    return this.request(`/api/admin/messages/${encodeURIComponent(messageId)}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // ------------------------------------------------------------------------
   // REAL-TIME SERVER-SENT EVENTS (SSE)
   // ------------------------------------------------------------------------
 

@@ -323,7 +323,7 @@ export async function handleApiRequest(req, res) {
     try {
       const body = await parseJsonBody(req);
       if (body.role === 'teacher' || (!body.email && body.password) || body.emailOrUsername || body.username) {
-        const identifier = body.emailOrUsername || body.username || body.email || body.identifier;
+        const identifier = body.emailOrUsername || body.username || body.email || body.identifier || 'teacher';
         const password = body.password;
         const rememberMe = Boolean(body.rememberMe);
 
@@ -696,7 +696,7 @@ export async function handleApiRequest(req, res) {
   if (pathname === '/api/admin/login' && method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const identifier = body.emailOrUsername || body.username || body.email || body.identifier;
+      const identifier = body.emailOrUsername || body.username || body.email || body.identifier || 'teacher';
       const password = body.password;
       const rememberMe = Boolean(body.rememberMe);
 
@@ -904,6 +904,72 @@ export async function handleApiRequest(req, res) {
     if (!admin) return sendError(res, 401, 'Unauthorized');
     await db.markNotificationsAsRead('teacher');
     return sendJson(res, 200, { success: true, message: 'All notifications marked as read' });
+  }
+
+  // ------------------------------------------------------------------------
+  // STUDENT ↔ TEACHER CHAT (MESSAGES)
+  // ------------------------------------------------------------------------
+  if (pathname === '/api/messages' && method === 'GET') {
+    const limit = parseInt(url.searchParams.get('limit') || '60', 10);
+    const messages = await db.getChatMessages(limit);
+    return sendJson(res, 200, { success: true, messages });
+  }
+
+  if (pathname === '/api/messages' && method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const { senderName, content, studentId, studentEmail } = body;
+      if (!content || !content.trim()) return sendError(res, 400, 'Message content required');
+
+      const newMsg = await db.createChatMessage({
+        senderRole: 'student',
+        senderName: senderName || 'Student',
+        studentId: studentId || null,
+        studentEmail: studentEmail || null,
+        content: content.trim()
+      });
+
+      broadcastSSE('new_chat_message', newMsg);
+      broadcastSSE('new_student_notification', {
+        title: 'New Student Question',
+        message: `${newMsg.senderName}: "${newMsg.content.slice(0, 50)}..."`,
+        studentId: newMsg.studentId
+      });
+      return sendJson(res, 201, { success: true, message: newMsg });
+    } catch (err) {
+      return sendError(res, 500, err.message);
+    }
+  }
+
+  if (pathname === '/api/admin/messages' && method === 'GET') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    const messages = await db.getChatMessages(100);
+    return sendJson(res, 200, { success: true, messages });
+  }
+
+  if (pathname === '/api/admin/messages/reply' && method === 'POST') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    try {
+      const body = await parseJsonBody(req);
+      const { messageId, replyText } = body;
+      if (!messageId || !replyText) return sendError(res, 400, 'messageId and replyText required');
+
+      await db.replyChatMessage(messageId, replyText);
+      broadcastSSE('chat_message_replied', { messageId, replyText });
+      return sendJson(res, 200, { success: true, messageId, replyText });
+    } catch (err) {
+      return sendError(res, 500, err.message);
+    }
+  }
+
+  const deleteMsgMatch = pathname.match(/^\/api\/admin\/messages\/([^/]+)$/);
+  if (deleteMsgMatch && method === 'DELETE') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    await db.deleteChatMessage(deleteMsgMatch[1]);
+    return sendJson(res, 200, { success: true, deleted: deleteMsgMatch[1] });
   }
 
   // Admin: Curriculum Management

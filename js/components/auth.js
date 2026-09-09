@@ -130,26 +130,26 @@ export function setupAuthModal(modalContainer, onStudentJoined) {
                     </div>
                   </div>
 
-                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <label for="teacher-side-identifier" style="display: block; font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
-                        TEACHER USERNAME OR EMAIL *
-                      </label>
-                      <input type="text" id="teacher-side-identifier" placeholder="e.g. teacher or teacher@homeacademy.com" value="teacher" required autocomplete="username"
-                        style="width: 100%; padding: 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="background: #fff; border: 1.5px solid rgba(217,4,41,0.2); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+                      <div>
+                        <div style="font-size: 0.68rem; text-transform: uppercase; font-weight: 800; color: var(--ha-red); letter-spacing: 0.05em;">TEACHER ACCOUNT</div>
+                        <div style="font-size: 0.95rem; font-weight: 800; color: var(--ha-navy);">Sir Zubair</div>
+                      </div>
+                      <span class="badge badge-red" style="font-size: 0.7rem; padding: 3px 8px;">Faculty Portal</span>
                     </div>
 
                     <div>
                       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                         <label for="teacher-side-password" style="font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
-                          TEACHER PASSWORD *
+                          ENTER TEACHER PASSWORD *
                         </label>
                       </div>
                       <div style="position: relative;">
-                        <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password"
-                          style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                        <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password" autofocus
+                          style="width: 100%; padding: 12px 38px 12px 14px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.95rem; outline: none; background: #fff;" />
                         <button type="button" class="toggle-password-btn" data-target="teacher-side-password"
-                          style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
+                          style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
                           👁️
                         </button>
                       </div>
@@ -396,24 +396,31 @@ export function setupAuthModal(modalContainer, onStudentJoined) {
       }
     });
 
-    // 2. RIGHT — Teacher Portal Form (Real Server Authentication)
+    // 2. RIGHT — Teacher Portal Form (Password-Only Authentication)
     const teacherForm = modalContainer.querySelector('#teacher-side-login-form');
     teacherForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const identifier = modalContainer.querySelector('#teacher-side-identifier')?.value?.trim();
       const password = modalContainer.querySelector('#teacher-side-password')?.value;
       const rememberMe = modalContainer.querySelector('#teacher-side-remember')?.checked;
       const errorMsg = modalContainer.querySelector('#teacher-side-error');
       const submitBtn = modalContainer.querySelector('#teacher-side-submit-btn');
 
+      if (!password || !password.trim()) {
+        if (errorMsg) {
+          errorMsg.textContent = 'Please enter the teacher password.';
+          errorMsg.style.display = 'block';
+        }
+        return;
+      }
+
       if (errorMsg) errorMsg.style.display = 'none';
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳</span> Verifying credentials...';
+        submitBtn.innerHTML = '<span>⏳</span> Verifying password...';
       }
 
       try {
-        await stateManager.verifyTeacherLogin({ identifier, password, rememberMe });
+        await stateManager.verifyTeacherLogin({ password: password.trim(), rememberMe });
         sound.playCorrect();
         closeModal();
         window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));

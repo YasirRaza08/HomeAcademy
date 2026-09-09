@@ -2836,6 +2836,32 @@
       });
     }
     // ------------------------------------------------------------------------
+    // STUDENT ↔ TEACHER CHAT (MESSAGES)
+    // ------------------------------------------------------------------------
+    async getChatMessages() {
+      return this.request("/api/messages");
+    }
+    async sendChatMessage({ senderName, content, studentId, studentEmail }) {
+      return this.request("/api/messages", {
+        method: "POST",
+        body: { senderName, content, studentId, studentEmail }
+      });
+    }
+    async adminGetMessages() {
+      return this.request("/api/admin/messages");
+    }
+    async adminReplyMessage(messageId, replyText) {
+      return this.request("/api/admin/messages/reply", {
+        method: "POST",
+        body: { messageId, replyText }
+      });
+    }
+    async adminDeleteMessage(messageId) {
+      return this.request(`/api/admin/messages/${encodeURIComponent(messageId)}`, {
+        method: "DELETE"
+      });
+    }
+    // ------------------------------------------------------------------------
     // REAL-TIME SERVER-SENT EVENTS (SSE)
     // ------------------------------------------------------------------------
     subscribeEvents(listener) {
@@ -8882,6 +8908,7 @@
         <button class="admin-tab-btn ${currentAdminTab === "quizzes" ? "active" : ""}" data-tab="quizzes">\u{1F4DD} Quizzes</button>
         <button class="admin-tab-btn ${currentAdminTab === "activities" ? "active" : ""}" data-tab="activities">\u{1F3AE} Activities</button>
         <button class="admin-tab-btn ${currentAdminTab === "roleplays" ? "active" : ""}" data-tab="roleplays">\u{1F3AD} Roleplays (${roleplays.length})</button>
+        <button class="admin-tab-btn ${currentAdminTab === "messages" ? "active" : ""}" data-tab="messages">\u{1F4AC} Messages</button>
         <button class="admin-tab-btn ${currentAdminTab === "leaderboard" ? "active" : ""}" data-tab="leaderboard">\u{1F3C6} Leaderboard</button>
         <button class="admin-tab-btn ${currentAdminTab === "notifications" ? "active" : ""}" data-tab="notifications">\u{1F514} Notifications ${unreadCount > 0 ? `(${unreadCount})` : ""}</button>
         <button class="admin-tab-btn ${currentAdminTab === "settings" ? "active" : ""}" data-tab="settings">\u2699\uFE0F Settings</button>
@@ -9115,6 +9142,9 @@
         break;
       case "roleplays":
         renderRoleplaysTab(contentMount, roleplays, mainContainer, onNavigate);
+        break;
+      case "messages":
+        renderMessagesTab(contentMount);
         break;
       case "leaderboard":
         renderLeaderboardTab(contentMount, students);
@@ -9826,6 +9856,118 @@
     </div>
   `;
   }
+  async function renderMessagesTab(mount) {
+    mount.innerHTML = `
+    <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 4px;">\u{1F4AC} Student Questions & Messages</h2>
+          <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+            Live questions sent by students through the Ask Sir Zubair chat box. Reply directly to assist them.
+          </p>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-refresh-messages">\u{1F504} Refresh Messages</button>
+      </div>
+
+      <div id="messages-list-container">
+        <p style="padding: 30px; text-align: center; color: var(--ha-text-muted);">Loading student questions...</p>
+      </div>
+    </div>
+  `;
+    async function loadAndRender() {
+      const listMount = mount.querySelector("#messages-list-container");
+      if (!listMount) return;
+      try {
+        const res = await apiClient2.adminGetMessages();
+        const messages = res?.messages || [];
+        if (messages.length === 0) {
+          listMount.innerHTML = `
+          <div style="padding: 36px 20px; text-align: center; background: #f8fafc; border-radius: var(--radius-md);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">\u{1F4AC}</div>
+            <p style="font-size: 0.92rem; color: var(--ha-text-muted); margin: 0;">No student questions yet. When students ask questions via the chat box, they will appear here.</p>
+          </div>
+        `;
+          return;
+        }
+        listMount.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          ${messages.map((m) => `
+            <div class="message-card-admin" style="padding: 16px 18px; background: #ffffff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <div>
+                  <span style="font-weight: 800; color: var(--ha-navy); font-size: 0.95rem;">\u{1F464} ${m.senderName || "Student"}</span>
+                  ${m.studentEmail ? `<span style="font-size: 0.76rem; color: var(--ha-text-muted); margin-left: 6px;">(${m.studentEmail})</span>` : ""}
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.72rem; color: var(--ha-text-muted);">${m.createdAt ? new Date(m.createdAt).toLocaleString() : ""}</span>
+                  <button type="button" class="btn btn-outline btn-xs btn-delete-msg" data-id="${m.messageId}" style="padding: 2px 6px; font-size: 0.7rem; color: var(--ha-red);">\u{1F5D1}\uFE0F</button>
+                </div>
+              </div>
+              <div style="font-size: 0.92rem; color: #1e293b; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--ha-navy); margin-bottom: 10px;">
+                ${m.content}
+              </div>
+
+              ${m.replyText ? `
+                <div style="background: #eff6ff; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #3b82f6; margin-bottom: 8px;">
+                  <div style="font-size: 0.75rem; font-weight: 800; color: #1d4ed8; margin-bottom: 3px;">
+                    \u{1F468}\u200D\u{1F3EB} Your Reply:
+                  </div>
+                  <div style="font-size: 0.88rem; color: #1e293b;">${m.replyText}</div>
+                </div>
+              ` : `
+                <div class="reply-form-mount" style="margin-top: 10px;">
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" class="input-reply-text" placeholder="Type your reply to ${m.senderName}..." style="flex: 1; padding: 8px 12px; font-size: 0.85rem; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); outline: none;" />
+                    <button type="button" class="btn btn-secondary btn-sm btn-send-reply" data-id="${m.messageId}">Reply</button>
+                  </div>
+                </div>
+              `}
+            </div>
+          `).join("")}
+        </div>
+      `;
+        listMount.querySelectorAll(".btn-send-reply").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const input = btn.closest(".reply-form-mount")?.querySelector(".input-reply-text");
+            const replyText = input?.value?.trim();
+            if (!replyText) return alert("Please enter reply text");
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+            try {
+              await apiClient2.adminReplyMessage(id, replyText);
+              sound.playSuccess();
+              loadAndRender();
+            } catch (e) {
+              alert(e.message);
+              btn.disabled = false;
+              btn.textContent = "Reply";
+            }
+          });
+        });
+        listMount.querySelectorAll(".btn-delete-msg").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            if (!confirm("Delete this message?")) return;
+            try {
+              await apiClient2.adminDeleteMessage(id);
+              sound.playSuccess();
+              loadAndRender();
+            } catch (e) {
+              alert(e.message);
+            }
+          });
+        });
+      } catch (err) {
+        listMount.innerHTML = `<p style="color: var(--ha-red); padding: 20px;">Failed to load messages: ${err.message}</p>`;
+      }
+    }
+    mount.querySelector("#btn-refresh-messages")?.addEventListener("click", () => {
+      sound.playClick();
+      loadAndRender();
+    });
+    loadAndRender();
+  }
   function renderNotificationsTab(mount, notifications, mainContainer) {
     mount.innerHTML = `
     <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy);">
@@ -10189,26 +10331,26 @@
                     </div>
                   </div>
 
-                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <label for="teacher-side-identifier" style="display: block; font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px; letter-spacing: 0.03em;">
-                        TEACHER USERNAME OR EMAIL *
-                      </label>
-                      <input type="text" id="teacher-side-identifier" placeholder="e.g. teacher or teacher@homeacademy.com" value="teacher" required autocomplete="username"
-                        style="width: 100%; padding: 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                  <form id="teacher-side-login-form" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="background: #fff; border: 1.5px solid rgba(217,4,41,0.2); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+                      <div>
+                        <div style="font-size: 0.68rem; text-transform: uppercase; font-weight: 800; color: var(--ha-red); letter-spacing: 0.05em;">TEACHER ACCOUNT</div>
+                        <div style="font-size: 0.95rem; font-weight: 800; color: var(--ha-navy);">Sir Zubair</div>
+                      </div>
+                      <span class="badge badge-red" style="font-size: 0.7rem; padding: 3px 8px;">Faculty Portal</span>
                     </div>
 
                     <div>
                       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                         <label for="teacher-side-password" style="font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); letter-spacing: 0.03em;">
-                          TEACHER PASSWORD *
+                          ENTER TEACHER PASSWORD *
                         </label>
                       </div>
                       <div style="position: relative;">
-                        <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password"
-                          style="width: 100%; padding: 11px 38px 11px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.92rem; outline: none; background: #fff;" />
+                        <input type="password" id="teacher-side-password" placeholder="Enter teacher password" required autocomplete="current-password" autofocus
+                          style="width: 100%; padding: 12px 38px 12px 14px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.95rem; outline: none; background: #fff;" />
                         <button type="button" class="toggle-password-btn" data-target="teacher-side-password"
-                          style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
+                          style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--ha-text-muted); padding: 4px;" title="Show or hide password">
                           \u{1F441}\uFE0F
                         </button>
                       </div>
@@ -10433,18 +10575,24 @@
       const teacherForm = modalContainer.querySelector("#teacher-side-login-form");
       teacherForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const identifier = modalContainer.querySelector("#teacher-side-identifier")?.value?.trim();
         const password = modalContainer.querySelector("#teacher-side-password")?.value;
         const rememberMe = modalContainer.querySelector("#teacher-side-remember")?.checked;
         const errorMsg = modalContainer.querySelector("#teacher-side-error");
         const submitBtn = modalContainer.querySelector("#teacher-side-submit-btn");
+        if (!password || !password.trim()) {
+          if (errorMsg) {
+            errorMsg.textContent = "Please enter the teacher password.";
+            errorMsg.style.display = "block";
+          }
+          return;
+        }
         if (errorMsg) errorMsg.style.display = "none";
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.innerHTML = "<span>\u23F3</span> Verifying credentials...";
+          submitBtn.innerHTML = "<span>\u23F3</span> Verifying password...";
         }
         try {
-          await stateManager.verifyTeacherLogin({ identifier, password, rememberMe });
+          await stateManager.verifyTeacherLogin({ password: password.trim(), rememberMe });
           sound.playCorrect();
           closeModal();
           window.dispatchEvent(new CustomEvent("ha:navigate", { detail: "admin" }));
@@ -13047,6 +13195,461 @@
     renderView();
   }
 
+  // js/components/chatBox.js
+  var ChatBox = class {
+    constructor() {
+      this.isOpen = false;
+      this.messages = [];
+      this.unreadCount = 0;
+      this.isSending = false;
+      this.container = null;
+    }
+    init() {
+      if (document.getElementById("ha-chat-widget")) return;
+      this.container = document.createElement("div");
+      this.container.id = "ha-chat-widget";
+      document.body.appendChild(this.container);
+      this.render();
+      this.loadMessages();
+      this.setupListeners();
+    }
+    setupListeners() {
+      apiClient2.subscribeEvents((type, data) => {
+        if (type === "new_chat_message") {
+          if (!this.messages.some((m) => m.messageId === data.messageId)) {
+            this.messages.push(data);
+            if (!this.isOpen) {
+              this.unreadCount++;
+              this.updateBadge();
+            }
+            this.renderMessages();
+          }
+        } else if (type === "chat_message_replied") {
+          const msg = this.messages.find((m) => m.messageId === data.messageId);
+          if (msg) {
+            msg.replyText = data.replyText;
+            msg.replyAt = (/* @__PURE__ */ new Date()).toISOString();
+            this.renderMessages();
+          }
+        }
+      });
+      stateManager.subscribe("STUDENT_LOGGED_IN", () => {
+        this.render();
+      });
+      stateManager.subscribe("STUDENT_JOINED", () => {
+        this.render();
+      });
+    }
+    async loadMessages() {
+      try {
+        const res = await apiClient2.getChatMessages();
+        if (res && Array.isArray(res.messages)) {
+          this.messages = res.messages;
+          this.renderMessages();
+        }
+      } catch (e) {
+      }
+    }
+    toggle() {
+      this.isOpen = !this.isOpen;
+      if (this.isOpen) {
+        this.unreadCount = 0;
+        this.updateBadge();
+        sound.playClick();
+      }
+      const panel = this.container.querySelector("#ha-chat-panel");
+      const fab = this.container.querySelector("#ha-chat-fab");
+      if (panel) panel.style.display = this.isOpen ? "flex" : "none";
+      if (fab) {
+        fab.style.display = this.isOpen ? "none" : "flex";
+      }
+      if (this.isOpen) {
+        setTimeout(() => {
+          this.scrollToBottom();
+          const input = this.container.querySelector("#chat-input-text");
+          if (input) input.focus();
+        }, 100);
+      }
+    }
+    updateBadge() {
+      const badge = this.container.querySelector("#chat-fab-badge");
+      if (badge) {
+        if (this.unreadCount > 0) {
+          badge.textContent = this.unreadCount;
+          badge.style.display = "flex";
+        } else {
+          badge.style.display = "none";
+        }
+      }
+    }
+    scrollToBottom() {
+      const msgList = this.container.querySelector("#chat-messages-list");
+      if (msgList) {
+        msgList.scrollTop = msgList.scrollHeight;
+      }
+    }
+    async sendMessage(text, studentNameOverride = null) {
+      const content = (text || "").trim();
+      if (!content || this.isSending) return;
+      const currentStudent = stateManager.getCurrentStudent();
+      const nameInput = this.container.querySelector("#chat-guest-name");
+      const senderName = currentStudent?.name || studentNameOverride || nameInput?.value?.trim() || "Student";
+      this.isSending = true;
+      const sendBtn = this.container.querySelector("#chat-send-btn");
+      if (sendBtn) sendBtn.disabled = true;
+      const tempId = "temp_" + Date.now();
+      const optMsg = {
+        messageId: tempId,
+        senderRole: "student",
+        senderName,
+        studentId: currentStudent?.id || null,
+        content,
+        replyText: null,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      this.messages.push(optMsg);
+      this.renderMessages();
+      this.scrollToBottom();
+      sound.playClick();
+      const textInput = this.container.querySelector("#chat-input-text");
+      if (textInput) textInput.value = "";
+      try {
+        const res = await apiClient2.sendChatMessage({
+          senderName,
+          content,
+          studentId: currentStudent?.id || null,
+          studentEmail: currentStudent?.email || null
+        });
+        if (res && res.message) {
+          const idx = this.messages.findIndex((m) => m.messageId === tempId);
+          if (idx !== -1) {
+            this.messages[idx] = res.message;
+            this.renderMessages();
+          }
+        }
+      } catch (err) {
+        console.warn("Chat send error:", err);
+      } finally {
+        this.isSending = false;
+        if (sendBtn) sendBtn.disabled = false;
+        this.scrollToBottom();
+      }
+    }
+    render() {
+      const currentStudent = stateManager.getCurrentStudent();
+      const isTeacher = stateManager.state.isAdmin;
+      this.container.innerHTML = `
+      <style>
+        #ha-chat-widget {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 99999;
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .chat-fab-button {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: linear-gradient(135deg, var(--ha-navy, #0A2558) 0%, #1e3a8a 100%);
+          color: #ffffff;
+          padding: 13px 20px;
+          border-radius: 999px;
+          border: 2px solid rgba(255,255,255,0.25);
+          box-shadow: 0 10px 25px -4px rgba(10, 37, 88, 0.45), 0 0 0 1px rgba(0,0,0,0.06);
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
+        }
+
+        .chat-fab-button:hover {
+          transform: translateY(-3px) scale(1.03);
+          box-shadow: 0 16px 32px -4px rgba(10, 37, 88, 0.55);
+        }
+
+        .chat-fab-pulse {
+          width: 10px;
+          height: 10px;
+          background: #10b981;
+          border-radius: 50%;
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          animation: chatPulse 2s infinite;
+        }
+
+        @keyframes chatPulse {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+          70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .chat-fab-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: var(--ha-red, #D90429);
+          color: #ffffff;
+          font-size: 0.72rem;
+          font-weight: 800;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #ffffff;
+        }
+
+        .chat-window-panel {
+          width: 380px;
+          max-width: calc(100vw - 32px);
+          height: 540px;
+          max-height: calc(100vh - 100px);
+          background: #ffffff;
+          border-radius: 20px;
+          box-shadow: 0 24px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1.5px rgba(0, 0, 0, 0.08);
+          display: none;
+          flex-direction: column;
+          overflow: hidden;
+          animation: chatSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes chatSlideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .chat-header {
+          background: linear-gradient(135deg, var(--ha-navy, #0A2558) 0%, #1e3a8a 100%);
+          color: #ffffff;
+          padding: 16px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .chat-messages-container {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          background: #F8FAFC;
+        }
+
+        .chat-bubble-student {
+          align-self: flex-end;
+          background: var(--ha-navy, #0A2558);
+          color: #ffffff;
+          padding: 10px 14px;
+          border-radius: 16px 16px 2px 16px;
+          max-width: 82%;
+          font-size: 0.88rem;
+          line-height: 1.45;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+          word-break: break-word;
+        }
+
+        .chat-bubble-teacher {
+          align-self: flex-start;
+          background: #ffffff;
+          color: var(--ha-navy, #0A2558);
+          border: 1.5px solid var(--ha-border, #E2E8F0);
+          padding: 11px 14px;
+          border-radius: 16px 16px 16px 2px;
+          max-width: 85%;
+          font-size: 0.88rem;
+          line-height: 1.45;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+          word-break: break-word;
+        }
+
+        .chat-quick-chip {
+          background: #ffffff;
+          border: 1.5px solid #CBD5E1;
+          color: var(--ha-navy, #0A2558);
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 0.76rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          text-align: left;
+        }
+
+        .chat-quick-chip:hover {
+          background: #EFF6FF;
+          border-color: #3B82F6;
+          transform: translateY(-1px);
+        }
+
+        .chat-footer {
+          padding: 12px 14px;
+          background: #ffffff;
+          border-top: 1.5px solid var(--ha-border, #E2E8F0);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        @media (max-width: 640px) {
+          #ha-chat-widget {
+            bottom: 74px; /* Above mobile bottom nav */
+            right: 14px;
+          }
+          .chat-window-panel {
+            width: calc(100vw - 28px);
+            height: calc(100vh - 160px);
+          }
+        }
+      </style>
+
+      <!-- FLOATING ACTION BUTTON (FAB) -->
+      <div class="chat-fab-button" id="ha-chat-fab" title="Chat with Sir Zubair">
+        <div class="chat-fab-pulse"></div>
+        <span style="font-size: 1.15rem;">\u{1F4AC}</span>
+        <div style="display: flex; flex-direction: column; line-height: 1.1;">
+          <span style="font-weight: 800; font-size: 0.88rem; letter-spacing: 0.02em;">Ask Sir Zubair</span>
+          <span style="font-size: 0.68rem; opacity: 0.85;">Online Help Desk</span>
+        </div>
+        <div class="chat-fab-badge" id="chat-fab-badge">0</div>
+      </div>
+
+      <!-- CHAT WINDOW PANEL -->
+      <div class="chat-window-panel" id="ha-chat-panel">
+        <!-- HEADER -->
+        <div class="chat-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; border: 2px solid #FCD34D;">
+              \u{1F468}\u200D\u{1F3EB}
+            </div>
+            <div>
+              <div style="font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                Sir Zubair
+                <span style="background: #10B981; color: #fff; font-size: 0.62rem; padding: 1px 6px; border-radius: 999px; font-weight: 700;">ONLINE</span>
+              </div>
+              <div style="font-size: 0.72rem; opacity: 0.85;">Home Academy Faculty Portal</div>
+            </div>
+          </div>
+          <button type="button" id="chat-close-btn" style="background: rgba(255,255,255,0.15); border: none; color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; font-weight: bold;" title="Close Chat">
+            \u2715
+          </button>
+        </div>
+
+        <!-- MESSAGES LIST -->
+        <div class="chat-messages-container" id="chat-messages-list">
+          <!-- GREETING MESSAGE -->
+          <div class="chat-bubble-teacher">
+            <div style="font-size: 0.7rem; font-weight: 800; color: var(--ha-red, #D90429); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <span>\u{1F468}\u200D\u{1F3EB}</span> Sir Zubair
+            </div>
+            <div>Assalam-o-Alaikum! Welcome to Home Academy. Ask me any question about your English grammar topics, quizzes, or vocabulary!</div>
+          </div>
+
+          <!-- QUICK QUESTIONS -->
+          <div id="chat-quick-suggestions" style="display: flex; flex-direction: column; gap: 6px; margin: 4px 0;">
+            <div style="font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #64748B; letter-spacing: 0.05em;">Suggested Questions:</div>
+            <button type="button" class="chat-quick-chip" data-q="Sir, what are the 6 main grammar topics in our course?">
+              \u{1F4D6} What are the 6 main grammar topics?
+            </button>
+            <button type="button" class="chat-quick-chip" data-q="Sir, how is my quiz score and XP calculated?">
+              \u2B50 How is my quiz score and XP calculated?
+            </button>
+            <button type="button" class="chat-quick-chip" data-q="Sir, can you help me practice English conversation for Topic 1?">
+              \u{1F5E3}\uFE0F How do I practice Topic 1 Roleplay?
+            </button>
+          </div>
+
+          <div id="dynamic-chat-messages"></div>
+        </div>
+
+        <!-- FOOTER INPUT -->
+        <div class="chat-footer">
+          ${!currentStudent && !isTeacher ? `
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <input type="text" id="chat-guest-name" placeholder="Your Name (e.g. Ali)" 
+                style="flex: 1; padding: 6px 10px; font-size: 0.78rem; border: 1.5px solid #CBD5E1; border-radius: 8px; outline: none;" />
+            </div>
+          ` : ""}
+          <form id="chat-input-form" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="chat-input-text" placeholder="Type your message for Sir Zubair..." required autocomplete="off"
+              style="flex: 1; padding: 10px 14px; font-size: 0.88rem; border: 1.5px solid #CBD5E1; border-radius: 999px; outline: none;" />
+            <button type="submit" id="chat-send-btn" style="background: var(--ha-navy, #0A2558); color: #fff; border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; transition: transform 0.15s ease;" title="Send Message">
+              \u27A4
+            </button>
+          </form>
+        </div>
+      </div>
+    `;
+      this.container.querySelector("#ha-chat-fab")?.addEventListener("click", () => this.toggle());
+      this.container.querySelector("#chat-close-btn")?.addEventListener("click", () => this.toggle());
+      this.container.querySelectorAll(".chat-quick-chip").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const q = btn.dataset.q;
+          if (q) this.sendMessage(q);
+        });
+      });
+      this.container.querySelector("#chat-input-form")?.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = this.container.querySelector("#chat-input-text")?.value;
+        this.sendMessage(text);
+      });
+      this.renderMessages();
+    }
+    renderMessages() {
+      const mount = this.container?.querySelector("#dynamic-chat-messages");
+      if (!mount) return;
+      if (this.messages.length === 0) {
+        mount.innerHTML = "";
+        return;
+      }
+      mount.innerHTML = this.messages.map((m) => {
+        const isTeacherMsg = m.senderRole === "teacher";
+        const timeStr = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+        let html = "";
+        if (isTeacherMsg) {
+          html += `
+          <div class="chat-bubble-teacher">
+            <div style="font-size: 0.7rem; font-weight: 800; color: var(--ha-red, #D90429); margin-bottom: 2px;">
+              \u{1F468}\u200D\u{1F3EB} Sir Zubair <span style="font-size: 0.65rem; color: #94A3B8; font-weight: normal; margin-left: 4px;">${timeStr}</span>
+            </div>
+            <div>${this.escapeHtml(m.content)}</div>
+          </div>
+        `;
+        } else {
+          html += `
+          <div class="chat-bubble-student">
+            <div style="font-size: 0.68rem; opacity: 0.85; margin-bottom: 2px;">
+              ${this.escapeHtml(m.senderName || "Student")} <span style="font-size: 0.62rem; opacity: 0.7; margin-left: 4px;">${timeStr}</span>
+            </div>
+            <div>${this.escapeHtml(m.content)}</div>
+          </div>
+        `;
+          if (m.replyText) {
+            const replyTime = m.replyAt ? new Date(m.replyAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+            html += `
+            <div class="chat-bubble-teacher" style="margin-top: 4px; border-left: 3px solid var(--ha-navy);">
+              <div style="font-size: 0.7rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 2px;">
+                \u{1F468}\u200D\u{1F3EB} Sir Zubair (Teacher Reply) <span style="font-size: 0.65rem; color: #94A3B8; font-weight: normal; margin-left: 4px;">${replyTime}</span>
+              </div>
+              <div>${this.escapeHtml(m.replyText)}</div>
+            </div>
+          `;
+          }
+        }
+        return html;
+      }).join("");
+      this.scrollToBottom();
+    }
+    escapeHtml(str) {
+      if (!str) return "";
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  };
+  var chatBox = new ChatBox();
+
   // js/app.js
   var App = class {
     constructor() {
@@ -13060,6 +13663,7 @@
         this.updateNavbarUser();
         this.navigate("dashboard");
       });
+      chatBox.init();
       this.setupNavigation();
       this.setupSoundToggle();
       this.setupGlobalEvents();

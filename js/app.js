@@ -12,6 +12,7 @@ import { setupAuthModal } from './components/auth.js';
 import { renderFullTest } from './components/fullTest.js';
 import { renderActivitiesHub } from './components/activitiesHub.js';
 import { renderRoleplaysHub, renderRoleplayRunner } from './components/roleplayView.js';
+import { chatBox } from './components/chatBox.js';
 
 class App {
   constructor() {
@@ -27,6 +28,9 @@ class App {
       this.updateNavbarUser();
       this.navigate('dashboard');
     });
+
+    // Initialize Floating Chat Box
+    chatBox.init();
 
     // Setup navbar & bottom nav
     this.setupNavigation();

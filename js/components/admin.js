@@ -118,6 +118,7 @@ export async function renderAdmin(container, onNavigate) {
         <button class="admin-tab-btn ${currentAdminTab === 'quizzes' ? 'active' : ''}" data-tab="quizzes">📝 Quizzes</button>
         <button class="admin-tab-btn ${currentAdminTab === 'activities' ? 'active' : ''}" data-tab="activities">🎮 Activities</button>
         <button class="admin-tab-btn ${currentAdminTab === 'roleplays' ? 'active' : ''}" data-tab="roleplays">🎭 Roleplays (${roleplays.length})</button>
+        <button class="admin-tab-btn ${currentAdminTab === 'messages' ? 'active' : ''}" data-tab="messages">💬 Messages</button>
         <button class="admin-tab-btn ${currentAdminTab === 'leaderboard' ? 'active' : ''}" data-tab="leaderboard">🏆 Leaderboard</button>
         <button class="admin-tab-btn ${currentAdminTab === 'notifications' ? 'active' : ''}" data-tab="notifications">🔔 Notifications ${unreadCount > 0 ? `(${unreadCount})` : ''}</button>
         <button class="admin-tab-btn ${currentAdminTab === 'settings' ? 'active' : ''}" data-tab="settings">⚙️ Settings</button>
@@ -377,6 +378,9 @@ async function renderActiveTab(tab, contentMount, mainContainer, onNavigate, dat
       break;
     case 'roleplays':
       renderRoleplaysTab(contentMount, roleplays, mainContainer, onNavigate);
+      break;
+    case 'messages':
+      renderMessagesTab(contentMount);
       break;
     case 'leaderboard':
       renderLeaderboardTab(contentMount, students);
@@ -1151,7 +1155,133 @@ function renderLeaderboardTab(mount, students) {
 }
 
 // --------------------------------------------------------------------------
-// 9. NOTIFICATIONS TAB
+// 9. STUDENT ↔ TEACHER CHAT (MESSAGES) TAB
+// --------------------------------------------------------------------------
+async function renderMessagesTab(mount) {
+  mount.innerHTML = `
+    <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 4px;">💬 Student Questions & Messages</h2>
+          <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+            Live questions sent by students through the Ask Sir Zubair chat box. Reply directly to assist them.
+          </p>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-refresh-messages">🔄 Refresh Messages</button>
+      </div>
+
+      <div id="messages-list-container">
+        <p style="padding: 30px; text-align: center; color: var(--ha-text-muted);">Loading student questions...</p>
+      </div>
+    </div>
+  `;
+
+  async function loadAndRender() {
+    const listMount = mount.querySelector('#messages-list-container');
+    if (!listMount) return;
+    try {
+      const res = await apiClient.adminGetMessages();
+      const messages = res?.messages || [];
+
+      if (messages.length === 0) {
+        listMount.innerHTML = `
+          <div style="padding: 36px 20px; text-align: center; background: #f8fafc; border-radius: var(--radius-md);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">💬</div>
+            <p style="font-size: 0.92rem; color: var(--ha-text-muted); margin: 0;">No student questions yet. When students ask questions via the chat box, they will appear here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listMount.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          ${messages.map(m => `
+            <div class="message-card-admin" style="padding: 16px 18px; background: #ffffff; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                <div>
+                  <span style="font-weight: 800; color: var(--ha-navy); font-size: 0.95rem;">👤 ${m.senderName || 'Student'}</span>
+                  ${m.studentEmail ? `<span style="font-size: 0.76rem; color: var(--ha-text-muted); margin-left: 6px;">(${m.studentEmail})</span>` : ''}
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.72rem; color: var(--ha-text-muted);">${m.createdAt ? new Date(m.createdAt).toLocaleString() : ''}</span>
+                  <button type="button" class="btn btn-outline btn-xs btn-delete-msg" data-id="${m.messageId}" style="padding: 2px 6px; font-size: 0.7rem; color: var(--ha-red);">🗑️</button>
+                </div>
+              </div>
+              <div style="font-size: 0.92rem; color: #1e293b; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--ha-navy); margin-bottom: 10px;">
+                ${m.content}
+              </div>
+
+              ${m.replyText ? `
+                <div style="background: #eff6ff; padding: 10px 14px; border-radius: 8px; border-left: 3px solid #3b82f6; margin-bottom: 8px;">
+                  <div style="font-size: 0.75rem; font-weight: 800; color: #1d4ed8; margin-bottom: 3px;">
+                    👨‍🏫 Your Reply:
+                  </div>
+                  <div style="font-size: 0.88rem; color: #1e293b;">${m.replyText}</div>
+                </div>
+              ` : `
+                <div class="reply-form-mount" style="margin-top: 10px;">
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" class="input-reply-text" placeholder="Type your reply to ${m.senderName}..." style="flex: 1; padding: 8px 12px; font-size: 0.85rem; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); outline: none;" />
+                    <button type="button" class="btn btn-secondary btn-sm btn-send-reply" data-id="${m.messageId}">Reply</button>
+                  </div>
+                </div>
+              `}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      // Bind replies
+      listMount.querySelectorAll('.btn-send-reply').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const input = btn.closest('.reply-form-mount')?.querySelector('.input-reply-text');
+          const replyText = input?.value?.trim();
+          if (!replyText) return alert('Please enter reply text');
+          btn.disabled = true;
+          btn.textContent = 'Sending...';
+          try {
+            await apiClient.adminReplyMessage(id, replyText);
+            sound.playSuccess();
+            loadAndRender();
+          } catch (e) {
+            alert(e.message);
+            btn.disabled = false;
+            btn.textContent = 'Reply';
+          }
+        });
+      });
+
+      // Bind deletes
+      listMount.querySelectorAll('.btn-delete-msg').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (!confirm('Delete this message?')) return;
+          try {
+            await apiClient.adminDeleteMessage(id);
+            sound.playSuccess();
+            loadAndRender();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+      });
+
+    } catch (err) {
+      listMount.innerHTML = `<p style="color: var(--ha-red); padding: 20px;">Failed to load messages: ${err.message}</p>`;
+    }
+  }
+
+  mount.querySelector('#btn-refresh-messages')?.addEventListener('click', () => {
+    sound.playClick();
+    loadAndRender();
+  });
+
+  loadAndRender();
+}
+
+// --------------------------------------------------------------------------
+// 10. NOTIFICATIONS TAB
 // --------------------------------------------------------------------------
 function renderNotificationsTab(mount, notifications, mainContainer) {
   mount.innerHTML = `
