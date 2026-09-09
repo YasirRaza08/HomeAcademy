@@ -27,30 +27,46 @@ const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
 const tursoToken = process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN;
 const isProduction = process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true';
 
-// STRICT PRODUCTION CHECK: Local SQLite file fallback is strictly forbidden in production
+let configError = null;
 if (isProduction && !tursoUrl) {
-  throw new Error(
-    'FATAL SERVER CONFIGURATION ERROR: TURSO_DATABASE_URL environment variable is missing in production! ' +
+  configError = 'TURSO_DATABASE_URL environment variable is missing in production! ' +
     'Local SQLite fallback is strictly prohibited on Netlify / production. ' +
-    'Please configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in your Netlify site settings.'
-  );
+    'Please configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Netlify Site configuration -> Environment variables.';
 }
 
 export const isTurso = Boolean(tursoUrl);
 
-export const client = createClient(
-  isTurso
-    ? { url: tursoUrl, authToken: tursoToken }
-    : { url: `file:${DB_PATH}` }
-);
+export const client = configError
+  ? null
+  : createClient(
+      isTurso
+        ? { url: tursoUrl, authToken: tursoToken }
+        : { url: `file:${DB_PATH}` }
+    );
 
-// Backward-compatible alias
 export const db = client;
+
+function getClient() {
+  if (!client) {
+    throw new Error(configError || 'Database client is not initialized. Please verify TURSO_DATABASE_URL.');
+  }
+  return client;
+}
 
 // --------------------------------------------------------------------------
 // HEALTH CHECK ENDPOINT HELPER
 // --------------------------------------------------------------------------
 export async function checkHealth() {
+  if (configError) {
+    return {
+      ok: false,
+      database: 'turso',
+      connected: false,
+      error: configError,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   try {
     const aliveRes = await client.execute('SELECT 1 as alive');
     const tableRes = await client.execute(
@@ -125,6 +141,7 @@ export function calculateLevel(xp = 0) {
 // SCHEMA MIGRATION & PROVISIONING (18 RELATIONAL TABLES)
 // --------------------------------------------------------------------------
 export async function initDatabase() {
+  const activeClient = getClient();
   const ddlStatements = [
     // 1. Users
     `CREATE TABLE IF NOT EXISTS users (
@@ -378,7 +395,7 @@ export async function initDatabase() {
   ];
 
   for (const stmt of ddlStatements) {
-    await client.execute(stmt);
+    await activeClient.execute(stmt);
   }
 
   await seedInitialDataIfEmpty();
@@ -388,42 +405,42 @@ export async function initDatabase() {
 // SYSTEM SEEDING (ZERO FAKE STUDENTS, REAL CONTENT ONLY)
 // --------------------------------------------------------------------------
 async function seedInitialDataIfEmpty() {
-  // 1. Seed Class & Teacher Admin
+  const activeClient = getClient();
   const initialTeacherPassword = process.env.INITIAL_ADMIN_PASSWORD || 'pakistan786';
   const adminHash = hashPasswordServer(initialTeacherPassword);
   const teacherUserId = 'usr_teacher_zubair';
 
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO users (user_id, role, email, password_hash, password_salt) VALUES (?, 'teacher', 'teacher@homeacademy.com', ?, 'bcrypt')`,
     args: [teacherUserId, adminHash]
   });
 
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO classes (class_id, code, name, teacher_id) VALUES ('cls_home_english', 'HOME-ENGLISH', 'Home Academy - English Language Program', 'tch_zubair')`,
     args: []
   });
 
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO teachers_admins (teacher_id, user_id, name, email) VALUES ('tch_zubair', ?, 'Sir Zubair', 'teacher@homeacademy.com')`,
     args: [teacherUserId]
   });
 
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('class_code', 'HOME-ENGLISH')`,
     args: []
   });
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('class_name', 'Home Academy - English Language Program')`,
     args: []
   });
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('teacher_name', 'Sir Zubair')`,
     args: []
   });
 
   // 2. Seed Achievements
   for (const a of ACHIEVEMENTS) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT OR IGNORE INTO achievements (achievement_id, title, description, xp_reward, type, requirement) VALUES (?, ?, ?, ?, ?, ?)`,
       args: [a.id, a.title, a.description, a.xpReward || 25, a.type || 'general', a.requirement || 1]
     });
@@ -431,11 +448,11 @@ async function seedInitialDataIfEmpty() {
 
   // 3. Seed Curriculum Topics & Quizzes
   for (const topic of OFFICIAL_TOPICS) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT OR IGNORE INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json) VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
       args: [topic.id, topic.number, topic.title, topic.subtitle || '', topic.summary || '', topic.color || '#0A2558', JSON.stringify(topic)]
     });
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT OR IGNORE INTO quizzes (quiz_id, topic_id, title, total_questions, pass_percentage) VALUES (?, ?, ?, 5, 80)`,
       args: [`quiz_${topic.id}`, topic.id, `${topic.title} Mastery Quiz`]
     });
@@ -444,7 +461,7 @@ async function seedInitialDataIfEmpty() {
   // 4. Seed Questions Database (90 real curriculum questions)
   for (const [topicId, qList] of Object.entries(TOPIC_QUESTION_BANKS)) {
     for (const q of qList) {
-      await client.execute({
+      await activeClient.execute({
         sql: `INSERT OR IGNORE INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active) VALUES (?, ?, ?, ?, ?, ?, ?, 'easy', 10, 1)`,
         args: [q.id, topicId, q.question, q.type || 'mcq', JSON.stringify(q.options || []), q.answer !== undefined ? q.answer : 0, q.explanation || '']
       });
@@ -453,7 +470,7 @@ async function seedInitialDataIfEmpty() {
 
   // 5. Seed Roleplays (5 official roleplay presentations)
   for (const rp of OFFICIAL_ROLEPLAYS) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT OR IGNORE INTO roleplays (roleplay_id, roleplay_number, title, scenario, grammar_focus, spoken_expressions_json, vocabulary_json, practice_questions_json, difficulty, color, active, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'beginner', ?, 1, ?)`,
       args: [
         rp.id,
@@ -475,13 +492,14 @@ async function seedInitialDataIfEmpty() {
 // STUDENT REPOSITORY OPERATIONS
 // --------------------------------------------------------------------------
 export async function createStudent({ id, name, email, passwordHash, passwordSalt, avatar, classCode }) {
+  const activeClient = getClient();
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = name.trim();
   const studentId = id || ('ha_stu_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'));
   const userId = 'usr_' + crypto.randomBytes(8).toString('hex');
   const joinDate = new Date().toISOString().split('T')[0];
 
-  const classRes = await client.execute({
+  const classRes = await activeClient.execute({
     sql: 'SELECT class_id, code FROM classes WHERE code = ? COLLATE NOCASE',
     args: [(classCode || 'HOME-ENGLISH').trim()]
   });
@@ -490,7 +508,7 @@ export async function createStudent({ id, name, email, passwordHash, passwordSal
     throw new Error('Invalid class code. Please check with your teacher.');
   }
 
-  const topicsRes = await client.execute('SELECT topic_id FROM curriculum_topics WHERE active = 1');
+  const topicsRes = await activeClient.execute('SELECT topic_id FROM curriculum_topics WHERE active = 1');
   const activeTopicIds = topicsRes.rows.map(t => t.topic_id);
 
   const notifId = 'notif_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
@@ -526,13 +544,14 @@ export async function createStudent({ id, name, email, passwordHash, passwordSal
     }
   ];
 
-  await client.batch(batchStatements, 'write');
+  await activeClient.batch(batchStatements, 'write');
   return getStudentById(studentId);
 }
 
 export async function getStudentByEmail(email) {
   if (!email) return null;
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM students WHERE email = ? COLLATE NOCASE`,
     args: [email.trim().toLowerCase()]
   });
@@ -542,7 +561,8 @@ export async function getStudentByEmail(email) {
 
 export async function getStudentById(id) {
   if (!id) return null;
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM students WHERE student_id = ?`,
     args: [id]
   });
@@ -552,7 +572,8 @@ export async function getStudentById(id) {
 
 export async function verifyStudentCredentials(email, password) {
   if (!email || !password) return null;
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM users WHERE email = ? COLLATE NOCASE AND role = 'student'`,
     args: [email.trim().toLowerCase()]
   });
@@ -565,18 +586,18 @@ export async function verifyStudentCredentials(email, password) {
   // Upgrade legacy hash to bcrypt if needed
   if (!user.password_hash.startsWith('$2a$') && !user.password_hash.startsWith('$2b$')) {
     const newHash = hashPasswordServer(password);
-    await client.execute({
+    await activeClient.execute({
       sql: `UPDATE users SET password_hash = ?, password_salt = 'bcrypt' WHERE user_id = ?`,
       args: [newHash, user.user_id]
     });
   }
 
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?`,
     args: [user.user_id]
   });
 
-  const stuRes = await client.execute({
+  const stuRes = await activeClient.execute({
     sql: `SELECT * FROM students WHERE user_id = ?`,
     args: [user.user_id]
   });
@@ -584,18 +605,20 @@ export async function verifyStudentCredentials(email, password) {
 }
 
 export async function getAllStudents() {
-  const res = await client.execute(`SELECT * FROM students ORDER BY xp DESC, level DESC`);
+  const activeClient = getClient();
+  const res = await activeClient.execute(`SELECT * FROM students ORDER BY xp DESC, level DESC`);
   return Promise.all(res.rows.map(formatStudentEntity));
 }
 
 export async function deleteStudentById(studentId) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: 'SELECT user_id FROM students WHERE student_id = ?',
     args: [studentId]
   });
   const student = res.rows[0];
   if (!student) return false;
-  await client.execute({
+  await activeClient.execute({
     sql: 'DELETE FROM users WHERE user_id = ?',
     args: [student.user_id]
   });
@@ -604,16 +627,17 @@ export async function deleteStudentById(studentId) {
 
 async function formatStudentEntity(row) {
   if (!row) return null;
+  const activeClient = getClient();
 
   const [progressRes, rpRes, achRes, quizStatsRes, gamesCountRes] = await Promise.all([
-    client.execute({ sql: `SELECT * FROM student_progress WHERE student_id = ?`, args: [row.student_id] }),
-    client.execute({ sql: `SELECT * FROM roleplay_attempts WHERE student_id = ?`, args: [row.student_id] }),
-    client.execute({ sql: `SELECT achievement_id FROM student_achievements WHERE student_id = ?`, args: [row.student_id] }),
-    client.execute({
+    activeClient.execute({ sql: `SELECT * FROM student_progress WHERE student_id = ?`, args: [row.student_id] }),
+    activeClient.execute({ sql: `SELECT * FROM roleplay_attempts WHERE student_id = ?`, args: [row.student_id] }),
+    activeClient.execute({ sql: `SELECT achievement_id FROM student_achievements WHERE student_id = ?`, args: [row.student_id] }),
+    activeClient.execute({
       sql: `SELECT COUNT(*) as taken, COALESCE(SUM(correct_answers), 0) as correct, COALESCE(SUM(total_questions), 0) as total FROM quiz_attempts WHERE student_id = ?`,
       args: [row.student_id]
     }),
-    client.execute({ sql: `SELECT COUNT(*) as count FROM activity_attempts WHERE student_id = ?`, args: [row.student_id] })
+    activeClient.execute({ sql: `SELECT COUNT(*) as count FROM activity_attempts WHERE student_id = ?`, args: [row.student_id] })
   ]);
 
   const topicProgress = {};
@@ -686,19 +710,20 @@ async function formatStudentEntity(row) {
 export async function getStudentDetailedProfile(studentId) {
   const student = await getStudentById(studentId);
   if (!student) return null;
+  const activeClient = getClient();
 
   const [quizRes, actRes, rpRes, xpRes, streakRes] = await Promise.all([
-    client.execute({ sql: `SELECT * FROM quiz_attempts WHERE student_id = ? ORDER BY completed_at DESC`, args: [studentId] }),
-    client.execute({ sql: `SELECT * FROM activity_attempts WHERE student_id = ? ORDER BY completed_at DESC`, args: [studentId] }),
-    client.execute({
+    activeClient.execute({ sql: `SELECT * FROM quiz_attempts WHERE student_id = ? ORDER BY completed_at DESC`, args: [studentId] }),
+    activeClient.execute({ sql: `SELECT * FROM activity_attempts WHERE student_id = ? ORDER BY completed_at DESC`, args: [studentId] }),
+    activeClient.execute({
       sql: `SELECT r.*, rp.title as roleplay_title, rp.roleplay_number
             FROM roleplay_attempts r
             LEFT JOIN roleplays rp ON r.roleplay_id = rp.roleplay_id
             WHERE r.student_id = ? ORDER BY r.completed_at DESC`,
       args: [studentId]
     }),
-    client.execute({ sql: `SELECT * FROM xp_transactions WHERE student_id = ? ORDER BY created_at DESC LIMIT 50`, args: [studentId] }),
-    client.execute({ sql: `SELECT * FROM streaks WHERE student_id = ?`, args: [studentId] })
+    activeClient.execute({ sql: `SELECT * FROM xp_transactions WHERE student_id = ? ORDER BY created_at DESC LIMIT 50`, args: [studentId] }),
+    activeClient.execute({ sql: `SELECT * FROM streaks WHERE student_id = ?`, args: [studentId] })
   ]);
 
   const streakData = streakRes.rows[0] || { current_streak: 0, highest_streak: 0, last_activity_date: null };
@@ -718,9 +743,10 @@ export async function getStudentDetailedProfile(studentId) {
 // --------------------------------------------------------------------------
 export async function awardXP({ studentId, amount, source, activityId = null, idempotencyKey = null }) {
   if (amount <= 0) return { student: await getStudentById(studentId), xpAwarded: 0 };
+  const activeClient = getClient();
 
   if (idempotencyKey) {
-    const existing = await client.execute({
+    const existing = await activeClient.execute({
       sql: `SELECT transaction_id FROM xp_transactions WHERE idempotency_key = ?`,
       args: [idempotencyKey]
     });
@@ -729,7 +755,7 @@ export async function awardXP({ studentId, amount, source, activityId = null, id
     }
   }
 
-  const studentRes = await client.execute({
+  const studentRes = await activeClient.execute({
     sql: `SELECT * FROM students WHERE student_id = ?`,
     args: [studentId]
   });
@@ -741,7 +767,7 @@ export async function awardXP({ studentId, amount, source, activityId = null, id
 
   const today = new Date().toISOString().split('T')[0];
   let newStreak = Number(student.streak || 0);
-  const streakRes = await client.execute({
+  const streakRes = await activeClient.execute({
     sql: `SELECT * FROM streaks WHERE student_id = ?`,
     args: [studentId]
   });
@@ -794,7 +820,7 @@ export async function awardXP({ studentId, amount, source, activityId = null, id
     });
   }
 
-  await client.batch(batch, 'write');
+  await activeClient.batch(batch, 'write');
   return { student: await getStudentById(studentId), xpAwarded: amount, newXP, newLevel: levelInfo.level, levelTitle: levelInfo.title };
 }
 
@@ -802,7 +828,8 @@ export async function awardXP({ studentId, amount, source, activityId = null, id
 // QUIZ ATTEMPTS & PROGRESS (SERVER-VALIDATED)
 // --------------------------------------------------------------------------
 export async function recordQuizSubmission({ studentId, topicId, submissionToken, score, totalQuestions, correctAnswers, incorrectAnswers, percentage }) {
-  const existing = await client.execute({
+  const activeClient = getClient();
+  const existing = await activeClient.execute({
     sql: `SELECT attempt_id FROM quiz_attempts WHERE submission_token = ?`,
     args: [submissionToken]
   });
@@ -814,7 +841,7 @@ export async function recordQuizSubmission({ studentId, topicId, submissionToken
   const isPerfect = percentage >= 100;
 
   let xpReward = 0;
-  const prevProgressRes = await client.execute({
+  const prevProgressRes = await activeClient.execute({
     sql: `SELECT passed FROM student_progress WHERE student_id = ? AND topic_id = ?`,
     args: [studentId, topicId]
   });
@@ -860,7 +887,7 @@ export async function recordQuizSubmission({ studentId, topicId, submissionToken
     });
   }
 
-  await client.batch(batch, 'write');
+  await activeClient.batch(batch, 'write');
 
   if (xpReward > 0) {
     await awardXP({
@@ -889,7 +916,8 @@ export async function recordTopicQuiz({ studentId, topicId, submissionToken, sco
 }
 
 export async function recordFullGrammarTest({ studentId, submissionToken, score = 24, total = 30, percent = 80, topicBreakdown = {} }) {
-  const existing = await client.execute({
+  const activeClient = getClient();
+  const existing = await activeClient.execute({
     sql: `SELECT attempt_id FROM quiz_attempts WHERE submission_token = ?`,
     args: [submissionToken]
   });
@@ -914,7 +942,7 @@ export async function recordFullGrammarTest({ studentId, submissionToken, score 
     }
   ];
 
-  await client.batch(batch, 'write');
+  await activeClient.batch(batch, 'write');
 
   await awardXP({
     studentId,
@@ -931,7 +959,8 @@ export async function recordFullGrammarTest({ studentId, submissionToken, score 
 // TOPIC PRACTICE & ACTIVITIES
 // --------------------------------------------------------------------------
 export async function recordTopicPractice(studentId, topicId, count = 1) {
-  await client.execute({
+  const activeClient = getClient();
+  await activeClient.execute({
     sql: `INSERT INTO student_progress (student_id, topic_id, practice_count)
           VALUES (?, ?, ?)
           ON CONFLICT(student_id, topic_id) DO UPDATE SET practice_count = practice_count + ?, updated_at = CURRENT_TIMESTAMP`,
@@ -947,14 +976,15 @@ export async function recordTopicPractice(studentId, topicId, count = 1) {
 }
 
 export async function recordTopicLearn(studentId, topicId) {
-  const existingRes = await client.execute({
+  const activeClient = getClient();
+  const existingRes = await activeClient.execute({
     sql: `SELECT learned FROM student_progress WHERE student_id = ? AND topic_id = ?`,
     args: [studentId, topicId]
   });
   const existing = existingRes.rows[0];
 
   if (!existing || !existing.learned) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT INTO student_progress (student_id, topic_id, learned)
             VALUES (?, ?, 1)
             ON CONFLICT(student_id, topic_id) DO UPDATE SET learned = 1, updated_at = CURRENT_TIMESTAMP`,
@@ -973,8 +1003,9 @@ export async function recordTopicLearn(studentId, topicId) {
 }
 
 export async function recordActivityCompletion({ studentId, topicId, activityType, score = 100, xpReward = 25, idempotencyKey = null }) {
+  const activeClient = getClient();
   const idempKey = idempotencyKey || `act_${studentId}_${topicId}_${activityType}`;
-  const existing = await client.execute({
+  const existing = await activeClient.execute({
     sql: `SELECT attempt_id FROM activity_attempts WHERE idempotency_key = ?`,
     args: [idempKey]
   });
@@ -995,7 +1026,7 @@ export async function recordActivityCompletion({ studentId, topicId, activityTyp
     }
   ];
 
-  await client.batch(batch, 'write');
+  await activeClient.batch(batch, 'write');
 
   await awardXP({
     studentId,
@@ -1012,6 +1043,7 @@ export async function recordActivityCompletion({ studentId, topicId, activityTyp
 // ROLEPLAY PRESENTATION PROGRESS
 // --------------------------------------------------------------------------
 export async function recordRoleplayAttempt({ studentId, roleplayId, score = 100, speakingScore = 100, percent = 100 }) {
+  const activeClient = getClient();
   if (typeof roleplayId === 'string' && roleplayId.match(/^rp_\d$/)) {
     roleplayId = roleplayId.replace(/^rp_(\d)$/, 'rp_0$1');
   }
@@ -1020,7 +1052,7 @@ export async function recordRoleplayAttempt({ studentId, roleplayId, score = 100
   const isPerfect = percent >= 100;
   const xpEarned = isPerfect ? 50 : (completed ? 25 : 10);
 
-  const existingRes = await client.execute({
+  const existingRes = await activeClient.execute({
     sql: `SELECT attempt_id, completed FROM roleplay_attempts WHERE student_id = ? AND roleplay_id = ?`,
     args: [studentId, roleplayId]
   });
@@ -1029,7 +1061,7 @@ export async function recordRoleplayAttempt({ studentId, roleplayId, score = 100
   const attemptId = existing ? existing.attempt_id : ('rpatt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'));
   const nowIso = new Date().toISOString();
 
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT INTO roleplay_attempts (attempt_id, student_id, roleplay_id, started, completed, score, speaking_score, xp_earned, progress_percentage, completed_at)
           VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(attempt_id) DO UPDATE SET
@@ -1050,21 +1082,21 @@ export async function recordRoleplayAttempt({ studentId, roleplayId, score = 100
     });
 
     const achId = roleplayId.replace('rp_0', 'roleplay_').replace('rp_', 'roleplay_') + '_complete';
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT OR IGNORE INTO student_achievements (student_id, achievement_id) VALUES (?, ?)`,
       args: [studentId, achId]
     });
   }
 
   const [totalRpsRes, completedRpsRes] = await Promise.all([
-    client.execute('SELECT COUNT(*) as count FROM roleplays WHERE active = 1'),
-    client.execute({ sql: 'SELECT COUNT(*) as count FROM roleplay_attempts WHERE student_id = ? AND completed = 1', args: [studentId] })
+    activeClient.execute('SELECT COUNT(*) as count FROM roleplays WHERE active = 1'),
+    activeClient.execute({ sql: 'SELECT COUNT(*) as count FROM roleplay_attempts WHERE student_id = ? AND completed = 1', args: [studentId] })
   ]);
   const totalRps = Number(totalRpsRes.rows[0]?.count || 5);
   const completedRps = Number(completedRpsRes.rows[0]?.count || 0);
   const overallRpPercent = Math.min(100, Math.round((completedRps / totalRps) * 100));
 
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE students SET roleplay_progress = ? WHERE student_id = ?`,
     args: [overallRpPercent, studentId]
   });
@@ -1080,11 +1112,12 @@ export async function recordRoleplayCompletion({ studentId, roleplayId, percent 
 // QUESTIONS REPOSITORY
 // --------------------------------------------------------------------------
 export async function getQuestionsByTopic(topicId, limit = 10, randomize = true) {
+  const activeClient = getClient();
   let query = 'SELECT * FROM questions WHERE topic_id = ? AND active = 1';
   if (randomize) query += ' ORDER BY RANDOM()';
   if (limit) query += ` LIMIT ${parseInt(limit, 10)}`;
 
-  const res = await client.execute({ sql: query, args: [topicId] });
+  const res = await activeClient.execute({ sql: query, args: [topicId] });
   return res.rows.map(r => ({
     id: r.question_id,
     topicId: r.topic_id,
@@ -1099,6 +1132,7 @@ export async function getQuestionsByTopic(topicId, limit = 10, randomize = true)
 }
 
 export async function getAllQuestionsAdmin(topicId = null) {
+  const activeClient = getClient();
   let query = 'SELECT * FROM questions';
   const args = [];
   if (topicId) {
@@ -1107,7 +1141,7 @@ export async function getAllQuestionsAdmin(topicId = null) {
   }
   query += ' ORDER BY topic_id ASC, created_at DESC';
 
-  const res = await client.execute({ sql: query, args });
+  const res = await activeClient.execute({ sql: query, args });
   return res.rows.map(r => ({
     id: r.question_id,
     topicId: r.topic_id,
@@ -1123,8 +1157,9 @@ export async function getAllQuestionsAdmin(topicId = null) {
 }
 
 export async function createQuestion({ topicId, question, questionType = 'mcq', options, correctAnswer = 0, explanation = '', difficulty = 'easy', xpReward = 10 }) {
+  const activeClient = getClient();
   const qId = 'q_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
     args: [qId, topicId, question.trim(), questionType, JSON.stringify(options || []), correctAnswer, explanation.trim(), difficulty, xpReward]
@@ -1133,7 +1168,8 @@ export async function createQuestion({ topicId, question, questionType = 'mcq', 
 }
 
 export async function updateQuestion(questionId, updates) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM questions WHERE question_id = ?`,
     args: [questionId]
   });
@@ -1147,7 +1183,7 @@ export async function updateQuestion(questionId, updates) {
   const difficulty = updates.difficulty !== undefined ? updates.difficulty : current.difficulty;
   const active = updates.active !== undefined ? (updates.active ? 1 : 0) : current.active;
 
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE questions SET question = ?, options_json = ?, correct_answer = ?, explanation = ?, difficulty = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE question_id = ?`,
     args: [question, optionsJson, correctAnswer, explanation, difficulty, active, questionId]
   });
@@ -1155,7 +1191,8 @@ export async function updateQuestion(questionId, updates) {
 }
 
 export async function deleteQuestion(questionId) {
-  return client.execute({
+  const activeClient = getClient();
+  return activeClient.execute({
     sql: `DELETE FROM questions WHERE question_id = ?`,
     args: [questionId]
   });
@@ -1165,8 +1202,9 @@ export async function deleteQuestion(questionId) {
 // NOTIFICATIONS REPOSITORY
 // --------------------------------------------------------------------------
 export async function createNotification({ recipientRole = 'teacher', studentId = null, title, message, type, data = {} }) {
+  const activeClient = getClient();
   const id = 'notif_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT INTO notifications (notification_id, recipient_role, student_id, title, message, type, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [id, recipientRole, studentId, title, message, type, JSON.stringify(data)]
   });
@@ -1174,7 +1212,8 @@ export async function createNotification({ recipientRole = 'teacher', studentId 
 }
 
 export async function getNotifications(recipientRole = 'teacher', limit = 50) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM notifications WHERE recipient_role = ? ORDER BY created_at DESC LIMIT ?`,
     args: [recipientRole, parseInt(limit, 10) || 50]
   });
@@ -1193,7 +1232,8 @@ export async function getNotifications(recipientRole = 'teacher', limit = 50) {
 }
 
 export async function markNotificationsAsRead(recipientRole = 'teacher') {
-  await client.execute({
+  const activeClient = getClient();
+  await activeClient.execute({
     sql: `UPDATE notifications SET is_read = 1 WHERE recipient_role = ?`,
     args: [recipientRole]
   });
@@ -1204,9 +1244,10 @@ export async function markNotificationsAsRead(recipientRole = 'teacher') {
 // SESSIONS & AUTHENTICATION
 // --------------------------------------------------------------------------
 export async function createSession(userId, studentId = null, role = 'student', expiryHours = 72) {
+  const activeClient = getClient();
   const token = 'ha_tok_' + crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + expiryHours * 3600000).toISOString();
-  await client.execute({
+  await activeClient.execute({
     sql: `INSERT INTO sessions (token, user_id, student_id, role, expires_at) VALUES (?, ?, ?, ?, ?)`,
     args: [token, userId, studentId, role, expiresAt]
   });
@@ -1215,14 +1256,15 @@ export async function createSession(userId, studentId = null, role = 'student', 
 
 export async function getSession(token) {
   if (!token) return null;
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT * FROM sessions WHERE token = ?`,
     args: [token]
   });
   const session = res.rows[0];
   if (!session) return null;
   if (session.expires_at && new Date(session.expires_at) < new Date()) {
-    await client.execute({ sql: `DELETE FROM sessions WHERE token = ?`, args: [token] });
+    await activeClient.execute({ sql: `DELETE FROM sessions WHERE token = ?`, args: [token] });
     return null;
   }
   return session;
@@ -1230,22 +1272,25 @@ export async function getSession(token) {
 
 export async function deleteSession(token) {
   if (!token) return;
-  await client.execute({
+  const activeClient = getClient();
+  await activeClient.execute({
     sql: `DELETE FROM sessions WHERE token = ?`,
     args: [token]
   });
 }
 
 export async function verifyTeacherPassword(password) {
-  const res = await client.execute(`SELECT * FROM users WHERE role = 'teacher' LIMIT 1`);
+  const activeClient = getClient();
+  const res = await activeClient.execute(`SELECT * FROM users WHERE role = 'teacher' LIMIT 1`);
   const user = res.rows[0];
   if (!user) return false;
   return verifyPasswordServer(password, user.password_hash, user.password_salt);
 }
 
 export async function updateTeacherPassword(newPassword) {
+  const activeClient = getClient();
   const hash = hashPasswordServer(newPassword);
-  await client.batch([
+  await activeClient.batch([
     {
       sql: `UPDATE users SET password_salt = 'bcrypt', password_hash = ? WHERE role = 'teacher'`,
       args: [hash]
@@ -1259,6 +1304,7 @@ export async function updateTeacherPassword(newPassword) {
 }
 
 export async function cleanProductionDatabase() {
+  const activeClient = getClient();
   const statements = [
     'DELETE FROM sessions;',
     'DELETE FROM student_achievements;',
@@ -1273,7 +1319,7 @@ export async function cleanProductionDatabase() {
     "DELETE FROM users WHERE role = 'student';"
   ];
   for (const s of statements) {
-    await client.execute(s);
+    await activeClient.execute(s);
   }
   return true;
 }
@@ -1282,7 +1328,8 @@ export async function cleanProductionDatabase() {
 // LEADERBOARD (REAL RECORDS ONLY, NO FAKE DATA)
 // --------------------------------------------------------------------------
 export async function getLeaderboard(limit = 50) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT student_id, full_name, avatar, level, xp, streak, join_date FROM students ORDER BY xp DESC, level DESC LIMIT ?`,
     args: [parseInt(limit, 10) || 50]
   });
@@ -1308,9 +1355,10 @@ export async function getLeaderboard(limit = 50) {
 // CLASS SETTINGS
 // --------------------------------------------------------------------------
 export async function getClassSettings() {
+  const activeClient = getClient();
   const [clsRes, teacherRes] = await Promise.all([
-    client.execute(`SELECT * FROM classes LIMIT 1`),
-    client.execute(`SELECT name FROM teachers_admins LIMIT 1`)
+    activeClient.execute(`SELECT * FROM classes LIMIT 1`),
+    activeClient.execute(`SELECT name FROM teachers_admins LIMIT 1`)
   ]);
   const cls = clsRes.rows[0];
   const teacher = teacherRes.rows[0];
@@ -1322,6 +1370,7 @@ export async function getClassSettings() {
 }
 
 export async function updateClassSettings({ name, code, teacher }) {
+  const activeClient = getClient();
   const batch = [];
   if (code) {
     batch.push(
@@ -1342,7 +1391,7 @@ export async function updateClassSettings({ name, code, teacher }) {
     );
   }
   if (batch.length > 0) {
-    await client.batch(batch, 'write');
+    await activeClient.batch(batch, 'write');
   }
   return getClassSettings();
 }
@@ -1351,10 +1400,11 @@ export async function updateClassSettings({ name, code, teacher }) {
 // CURRICULUM & ROLEPLAYS GETTERS
 // --------------------------------------------------------------------------
 export async function getCurriculumTopics(includeInactive = false) {
+  const activeClient = getClient();
   const sql = includeInactive
     ? `SELECT * FROM curriculum_topics ORDER BY CAST(number AS INTEGER) ASC`
     : `SELECT * FROM curriculum_topics WHERE active = 1 ORDER BY CAST(number AS INTEGER) ASC`;
-  const res = await client.execute(sql);
+  const res = await activeClient.execute(sql);
 
   return res.rows.map(r => {
     try {
@@ -1367,14 +1417,15 @@ export async function getCurriculumTopics(includeInactive = false) {
 }
 
 export async function toggleCurriculumTopic(topicId) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT active FROM curriculum_topics WHERE topic_id = ?`,
     args: [topicId]
   });
   const topic = res.rows[0];
   if (!topic) throw new Error('Topic not found');
   const nextActive = topic.active === 1 ? 0 : 1;
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE curriculum_topics SET active = ?, updated_at = CURRENT_TIMESTAMP WHERE topic_id = ?`,
     args: [nextActive, topicId]
   });
@@ -1382,7 +1433,8 @@ export async function toggleCurriculumTopic(topicId) {
 }
 
 export async function deleteCurriculumTopic(topicId) {
-  await client.execute({
+  const activeClient = getClient();
+  await activeClient.execute({
     sql: `DELETE FROM curriculum_topics WHERE topic_id = ?`,
     args: [topicId]
   });
@@ -1390,9 +1442,10 @@ export async function deleteCurriculumTopic(topicId) {
 }
 
 export async function resetCurriculumTopics() {
-  await client.execute(`DELETE FROM curriculum_topics`);
+  const activeClient = getClient();
+  await activeClient.execute(`DELETE FROM curriculum_topics`);
   for (const topic of OFFICIAL_TOPICS) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json) VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
       args: [topic.id, topic.number, topic.title, topic.subtitle || '', topic.summary || '', topic.color || '#0A2558', JSON.stringify(topic)]
     });
@@ -1401,10 +1454,11 @@ export async function resetCurriculumTopics() {
 }
 
 export async function getRoleplays(includeInactive = false) {
+  const activeClient = getClient();
   const sql = includeInactive
     ? `SELECT * FROM roleplays ORDER BY CAST(roleplay_number AS INTEGER) ASC`
     : `SELECT * FROM roleplays WHERE active = 1 ORDER BY CAST(roleplay_number AS INTEGER) ASC`;
-  const res = await client.execute(sql);
+  const res = await activeClient.execute(sql);
 
   return res.rows.map(r => {
     try {
@@ -1417,14 +1471,15 @@ export async function getRoleplays(includeInactive = false) {
 }
 
 export async function toggleRoleplayActive(roleplayId) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT active FROM roleplays WHERE roleplay_id = ?`,
     args: [roleplayId]
   });
   const rp = res.rows[0];
   if (!rp) throw new Error('Roleplay presentation not found');
   const nextActive = rp.active === 1 ? 0 : 1;
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE roleplays SET active = ?, updated_at = CURRENT_TIMESTAMP WHERE roleplay_id = ?`,
     args: [nextActive, roleplayId]
   });
@@ -1432,7 +1487,8 @@ export async function toggleRoleplayActive(roleplayId) {
 }
 
 export async function updateRoleplay(roleplayId, updates) {
-  const res = await client.execute({
+  const activeClient = getClient();
+  const res = await activeClient.execute({
     sql: `SELECT data_json FROM roleplays WHERE roleplay_id = ?`,
     args: [roleplayId]
   });
@@ -1441,7 +1497,7 @@ export async function updateRoleplay(roleplayId, updates) {
   const parsed = JSON.parse(rp.data_json || '{}');
   const merged = { ...parsed, ...updates };
 
-  await client.execute({
+  await activeClient.execute({
     sql: `UPDATE roleplays SET title = ?, scenario = ?, data_json = ?, updated_at = CURRENT_TIMESTAMP WHERE roleplay_id = ?`,
     args: [merged.title, merged.scenario, JSON.stringify(merged), roleplayId]
   });
@@ -1450,7 +1506,8 @@ export async function updateRoleplay(roleplayId, updates) {
 }
 
 export async function deleteRoleplay(roleplayId) {
-  await client.execute({
+  const activeClient = getClient();
+  await activeClient.execute({
     sql: `DELETE FROM roleplays WHERE roleplay_id = ?`,
     args: [roleplayId]
   });
@@ -1458,9 +1515,10 @@ export async function deleteRoleplay(roleplayId) {
 }
 
 export async function resetRoleplays() {
-  await client.execute(`DELETE FROM roleplays`);
+  const activeClient = getClient();
+  await activeClient.execute(`DELETE FROM roleplays`);
   for (const rp of OFFICIAL_ROLEPLAYS) {
-    await client.execute({
+    await activeClient.execute({
       sql: `INSERT INTO roleplays (roleplay_id, roleplay_number, title, scenario, grammar_focus, spoken_expressions_json, vocabulary_json, practice_questions_json, difficulty, color, active, data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'beginner', ?, 1, ?)`,
       args: [
         rp.id,

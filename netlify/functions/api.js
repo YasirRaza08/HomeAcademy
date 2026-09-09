@@ -5,7 +5,6 @@
 import { handleApiRequest } from '../../server/apiRouter.js';
 import { initDatabase } from '../../data/db.js';
 
-// Self-healing schema initialization on serverless function cold start
 let initPromise = null;
 function ensureDatabaseInitialized() {
   if (!initPromise) {
@@ -14,39 +13,105 @@ function ensureDatabaseInitialized() {
         console.log('[Home Academy] Production database schema verified on cold start.');
       })
       .catch(err => {
-        console.error('[Home Academy] Database initialization error on cold start:', err);
+        console.warn('[Home Academy] Database initialization notice on cold start:', err.message);
         initPromise = null; // Reset to allow retry on next request
-        throw err;
       });
   }
   return initPromise;
 }
 
 /**
- * Netlify Function Handler (Modern Web Standard Request/Response)
+ * Universal Handler: Supports both Netlify V1 (AWS Lambda event) and Netlify V2 (Web Request)
  */
-export default async function handler(request, context) {
-  try {
-    await ensureDatabaseInitialized();
-  } catch (initErr) {
-    return new Response(JSON.stringify({
-      error: 'Database connection or initialization failed: ' + initErr.message,
-      success: false
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+export const handler = async (eventOrRequest, context) => {
+  // Ensure DB migration in background
+  ensureDatabaseInitialized().catch(() => {});
+
+  // Detection: Web API standard Request (Netlify Functions v2)
+  if (eventOrRequest && typeof eventOrRequest.text === 'function' && typeof eventOrRequest.url === 'string') {
+    return handleWebRequest(eventOrRequest, context);
   }
 
-  // Extract URL, method, headers
+  // AWS Lambda / Netlify Functions v1 event format
+  return handleLambdaEvent(eventOrRequest, context);
+};
+
+export default handler;
+export const handlerLegacy = handler;
+
+async function handleLambdaEvent(event = {}, context) {
+  const rawPath = event.path || '/api';
+  const queryString = event.rawQuery ? `?${event.rawQuery}` : (
+    event.queryStringParameters && Object.keys(event.queryStringParameters).length > 0
+      ? '?' + new URLSearchParams(event.queryStringParameters).toString()
+      : ''
+  );
+  const fullUrlPath = (rawPath.startsWith('/') ? rawPath : `/${rawPath}`) + queryString;
+
+  const mockReq = {
+    url: fullUrlPath,
+    method: (event.httpMethod || 'GET').toUpperCase(),
+    headers: event.headers || {},
+    body: event.body || '',
+    on(ev, fn) {
+      if (ev === 'data' && event.body) fn(Buffer.from(event.body));
+      if (ev === 'end') fn();
+      return this;
+    }
+  };
+
+  return new Promise((resolve) => {
+    let statusCode = 200;
+    const responseHeaders = {
+      'content-type': 'application/json; charset=UTF-8',
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'access-control-allow-headers': 'Content-Type, Authorization, X-Requested-With'
+    };
+    const responseChunks = [];
+
+    const mockRes = {
+      headersSent: false,
+      writeHead(code, h = {}) {
+        statusCode = code;
+        for (const [k, v] of Object.entries(h)) {
+          responseHeaders[k.toLowerCase()] = v;
+        }
+        this.headersSent = true;
+      },
+      setHeader(name, val) {
+        responseHeaders[name.toLowerCase()] = val;
+      },
+      write(chunk) {
+        if (chunk) responseChunks.push(typeof chunk === 'string' ? chunk : chunk.toString());
+      },
+      end(data) {
+        if (data) responseChunks.push(typeof data === 'string' ? data : data.toString());
+        resolve({
+          statusCode,
+          headers: responseHeaders,
+          body: responseChunks.join('')
+        });
+      }
+    };
+
+    handleApiRequest(mockReq, mockRes).catch(err => {
+      console.error('[API Router Error]:', err);
+      resolve({
+        statusCode: 500,
+        headers: responseHeaders,
+        body: JSON.stringify({ error: err.message, success: false })
+      });
+    });
+  });
+}
+
+async function handleWebRequest(request, context) {
   const url = new URL(request.url);
   const method = request.method;
-  
   let bodyBuffer = '';
   if (method !== 'GET' && method !== 'HEAD') {
-    try {
-      bodyBuffer = await request.text();
-    } catch (e) {}
+    try { bodyBuffer = await request.text(); } catch (e) {}
   }
 
   const headers = {};
@@ -60,11 +125,8 @@ export default async function handler(request, context) {
     headers,
     body: bodyBuffer,
     on(event, fn) {
-      if (event === 'data' && bodyBuffer) {
-        fn(Buffer.from(bodyBuffer));
-      } else if (event === 'end') {
-        fn();
-      }
+      if (event === 'data' && bodyBuffer) fn(Buffer.from(bodyBuffer));
+      if (event === 'end') fn();
       return this;
     }
   };
@@ -89,8 +151,7 @@ export default async function handler(request, context) {
       },
       end(data) {
         if (data) responseChunks.push(typeof data === 'string' ? data : data.toString());
-        const bodyContent = responseChunks.join('');
-        resolve(new Response(bodyContent, {
+        resolve(new Response(responseChunks.join(''), {
           status: statusCode,
           headers: responseHeaders
         }));
@@ -98,7 +159,6 @@ export default async function handler(request, context) {
     };
 
     handleApiRequest(mockReq, mockRes).catch(err => {
-      console.error('[Netlify Function API Error]:', err);
       resolve(new Response(JSON.stringify({ error: err.message, success: false }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -106,61 +166,3 @@ export default async function handler(request, context) {
     });
   });
 }
-
-/**
- * AWS Lambda / Netlify legacy event-based compatibility handler
- */
-export const handlerLegacy = async (event, context) => {
-  try {
-    await ensureDatabaseInitialized();
-  } catch (initErr) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Database initialization failed: ' + initErr.message, success: false })
-    };
-  }
-
-  const url = new URL(event.rawUrl || `http://localhost${event.path}`);
-  const req = {
-    url: url.pathname + url.search,
-    method: event.httpMethod,
-    headers: event.headers || {},
-    body: event.body || '',
-    on(ev, fn) {
-      if (ev === 'data' && event.body) fn(event.body);
-      if (ev === 'end') fn();
-      return this;
-    }
-  };
-
-  return new Promise((resolve) => {
-    let statusCode = 200;
-    const headers = {};
-    const chunks = [];
-
-    const res = {
-      writeHead(code, h = {}) {
-        statusCode = code;
-        Object.assign(headers, h);
-      },
-      write(c) { chunks.push(c); },
-      end(data) {
-        if (data) chunks.push(data);
-        resolve({
-          statusCode,
-          headers,
-          body: chunks.join('')
-        });
-      }
-    };
-
-    handleApiRequest(req, res).catch(err => {
-      resolve({
-        statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: err.message, success: false })
-      });
-    });
-  });
-};
