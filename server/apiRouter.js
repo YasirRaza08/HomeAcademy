@@ -153,6 +153,14 @@ function resetRateLimit(key) {
 }
 
 function getAuthToken(req, url) {
+  const isTargetingAdmin = url.pathname.startsWith('/api/admin/');
+  const cookies = parseCookies(req);
+
+  // For admin routes, prioritize ha_admin_session cookie over generic student bearer tokens
+  if (isTargetingAdmin && cookies.ha_admin_session) {
+    return cookies.ha_admin_session;
+  }
+
   // 1. Authorization: Bearer <token>
   const authHeader = req.headers['authorization'] || req.headers['Authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -160,7 +168,6 @@ function getAuthToken(req, url) {
   }
 
   // 2. HTTP-Only Cookie: ha_admin_session or ha_session
-  const cookies = parseCookies(req);
   if (cookies.ha_admin_session) {
     return cookies.ha_admin_session;
   }

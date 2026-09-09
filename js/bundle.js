@@ -2553,8 +2553,11 @@
         "Content-Type": "application/json",
         ...options.headers || {}
       };
-      if (options.isAdmin && this.adminToken) {
-        headers["Authorization"] = `Bearer ${this.adminToken}`;
+      const isAdminPath = path.startsWith("/api/admin/");
+      if (options.isAdmin || isAdminPath) {
+        if (this.adminToken) {
+          headers["Authorization"] = `Bearer ${this.adminToken}`;
+        }
       } else if (this.token) {
         headers["Authorization"] = `Bearer ${this.token}`;
       }
@@ -2848,17 +2851,19 @@
       });
     }
     async adminGetMessages() {
-      return this.request("/api/admin/messages");
+      return this.request("/api/admin/messages", { isAdmin: true });
     }
     async adminReplyMessage(messageId, replyText) {
       return this.request("/api/admin/messages/reply", {
         method: "POST",
+        isAdmin: true,
         body: { messageId, replyText }
       });
     }
     async adminDeleteMessage(messageId) {
       return this.request(`/api/admin/messages/${encodeURIComponent(messageId)}`, {
-        method: "DELETE"
+        method: "DELETE",
+        isAdmin: true
       });
     }
     // ------------------------------------------------------------------------

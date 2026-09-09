@@ -48,8 +48,11 @@ class ApiClient {
     };
 
     // Attach student or admin token if available (Bearer fallback)
-    if (options.isAdmin && this.adminToken) {
-      headers['Authorization'] = `Bearer ${this.adminToken}`;
+    const isAdminPath = path.startsWith('/api/admin/');
+    if (options.isAdmin || isAdminPath) {
+      if (this.adminToken) {
+        headers['Authorization'] = `Bearer ${this.adminToken}`;
+      }
     } else if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
@@ -392,19 +395,21 @@ class ApiClient {
   }
 
   async adminGetMessages() {
-    return this.request('/api/admin/messages');
+    return this.request('/api/admin/messages', { isAdmin: true });
   }
 
   async adminReplyMessage(messageId, replyText) {
     return this.request('/api/admin/messages/reply', {
       method: 'POST',
+      isAdmin: true,
       body: { messageId, replyText }
     });
   }
 
   async adminDeleteMessage(messageId) {
     return this.request(`/api/admin/messages/${encodeURIComponent(messageId)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      isAdmin: true
     });
   }
 
