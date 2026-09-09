@@ -30,6 +30,14 @@ export async function renderAdmin(container, onNavigate) {
     return;
   }
 
+  // Fetch real students roster from database
+  try {
+    const rosterRes = await apiClient.adminGetRoster();
+    if (rosterRes && Array.isArray(rosterRes.students)) {
+      stateManager.state.students = rosterRes.students.map(s => ({ ...s }));
+    }
+  } catch (e) {}
+
   const classInfo = stateManager.state.classInfo || { name: 'Home Academy: English Language Program', code: 'HOME-ENGLISH', teacher: 'Sir Zubair' };
   const students = stateManager.state.students || [];
   const curriculumTopics = stateManager.state.curriculumTopics || [];
@@ -240,10 +248,21 @@ export async function renderAdmin(container, onNavigate) {
   const tabContent = container.querySelector('#admin-tab-content');
   const switchTab = (tab) => {
     currentAdminTab = tab;
+    const currentStudents = stateManager.state.students || [];
+    const currentClassXP = currentStudents.reduce((sum, s) => sum + (s.xp || 0), 0);
     container.querySelectorAll('.admin-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-    renderActiveTab(tab, tabContent, container, onNavigate, { students, classInfo, curriculumTopics, roleplays, notifications, totalStudents, totalClassXP, activeTopicsCount });
+    renderActiveTab(tab, tabContent, container, onNavigate, {
+      students: currentStudents,
+      classInfo,
+      curriculumTopics,
+      roleplays,
+      notifications,
+      totalStudents: currentStudents.length,
+      totalClassXP: currentClassXP,
+      activeTopicsCount
+    });
   };
 
   container.querySelectorAll('.admin-tab-btn').forEach(btn => {
@@ -348,6 +367,17 @@ export async function renderAdmin(container, onNavigate) {
   container.querySelector('#admin-switch-dash')?.addEventListener('click', () => {
     sound.playClick();
     if (onNavigate) onNavigate('dashboard');
+  });
+
+  // Real-time synchronization: Update faculty console when any student earns XP or joins
+  const unsubAdmin = stateManager.subscribe((event) => {
+    if (!container.isConnected) {
+      if (unsubAdmin) unsubAdmin();
+      return;
+    }
+    if (event === 'LEADERBOARD_UPDATED' || event === 'STUDENT_UPDATED' || event === 'STUDENT_JOINED' || event === 'XP_GAINED') {
+      switchTab(currentAdminTab);
+    }
   });
 }
 

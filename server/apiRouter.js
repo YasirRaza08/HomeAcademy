@@ -507,6 +507,61 @@ export async function handleApiRequest(req, res) {
     return sendJson(res, 200, { success: true, achievements: auth.student.unlockedAchievements });
   }
 
+  // Record General / Game XP for authenticated student (POST /api/student/xp)
+  if (pathname === '/api/student/xp' && method === 'POST') {
+    const auth = await requireStudentAuth(req, url);
+    if (!auth) return sendError(res, 401, 'Unauthorized: Please log in to save your XP');
+
+    const body = await parseJsonBody(req);
+    const amount = Math.min(200, Math.max(1, parseInt(body.amount, 10) || 10));
+    const activityType = (body.activityType || 'general').trim();
+    const idempotencyKey = body.idempotencyKey || `xp_${auth.student.id}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    const result = await db.awardXP({
+      studentId: auth.student.id,
+      amount,
+      source: activityType,
+      activityId: activityType,
+      idempotencyKey
+    });
+
+    broadcastSSE('leaderboard_update', { studentId: auth.student.id, xp: result.student?.xp });
+
+    return sendJson(res, 200, {
+      success: true,
+      student: result.student,
+      xpAwarded: result.xpAwarded,
+      newXP: result.student?.xp || 0
+    });
+  }
+
+  // Synchronize Student Progress / Offline Earned XP (POST /api/student/sync)
+  if (pathname === '/api/student/sync' && method === 'POST') {
+    const auth = await requireStudentAuth(req, url);
+    if (!auth) return sendError(res, 401, 'Unauthorized: Invalid session');
+
+    const body = await parseJsonBody(req);
+    const localXP = parseInt(body.xp, 10);
+
+    let updatedStudent = auth.student;
+    if (!isNaN(localXP) && localXP > (auth.student.xp || 0)) {
+      const diff = localXP - (auth.student.xp || 0);
+      const resAward = await db.awardXP({
+        studentId: auth.student.id,
+        amount: diff,
+        source: 'sync_offline_xp',
+        activityId: 'sync'
+      });
+      updatedStudent = resAward.student;
+      broadcastSSE('leaderboard_update', { studentId: auth.student.id, xp: updatedStudent?.xp });
+    }
+
+    return sendJson(res, 200, {
+      success: true,
+      student: updatedStudent
+    });
+  }
+
   // ------------------------------------------------------------------------
   // 5. SERVER-SIDE XP & SUBMISSIONS
   // ------------------------------------------------------------------------

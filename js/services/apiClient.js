@@ -31,6 +31,10 @@ class ApiClient {
     } catch (e) {}
   }
 
+  clearToken() {
+    this.setToken(null);
+  }
+
   setAdminToken(token) {
     this.adminToken = token;
     try {
@@ -39,6 +43,10 @@ class ApiClient {
         else localStorage.removeItem(ADMIN_TOKEN_KEY);
       }
     } catch (e) {}
+  }
+
+  clearAdminToken() {
+    this.setAdminToken(null);
   }
 
   async request(path, options = {}) {
@@ -377,6 +385,20 @@ class ApiClient {
     return this.request(`/api/roleplays/${encodeURIComponent(roleplayId)}/complete`, {
       method: 'POST',
       body: { percent }
+    });
+  }
+
+  async recordXP({ amount, activityType = 'general', idempotencyKey = null }) {
+    return this.request('/api/student/xp', {
+      method: 'POST',
+      body: { amount, activityType, idempotencyKey }
+    });
+  }
+
+  async syncStudent(data) {
+    return this.request('/api/student/sync', {
+      method: 'POST',
+      body: data
     });
   }
 

@@ -210,6 +210,9 @@ class StateManager {
         this.state.roleplays = rpRes.roleplays;
       }
 
+      // Keep snapshot of local student cache before refreshing from server
+      const localStudentsCopy = Array.isArray(this.state.students) ? [...this.state.students] : [];
+
       // 4. Sync Leaderboard / Roster from authoritative server database (Zero fake students)
       const lbRes = await apiClient.getLeaderboard(100).catch(() => null);
       if (lbRes && Array.isArray(lbRes.leaderboard)) {
@@ -220,6 +223,28 @@ class StateManager {
       const me = await apiClient.getMe().catch(() => null);
       if (me) {
         this.state.currentStudentId = me.id;
+        const currentLocal = localStudentsCopy.find(s => s.id === me.id || (s.email && me.email && s.email.toLowerCase() === me.email.toLowerCase()));
+        const localXP = Number(currentLocal?.xp || 0);
+        const serverXP = Number(me.xp || 0);
+
+        if (localXP > serverXP) {
+          try {
+            const syncRes = await apiClient.syncStudent({
+              xp: localXP,
+              streak: Math.max(Number(currentLocal?.streak) || 0, Number(me.streak) || 0),
+              level: Math.max(Number(currentLocal?.level) || 1, Number(me.level) || 1),
+              topicProgress: currentLocal?.topicProgress || {},
+              roleplayProgress: currentLocal?.roleplayProgress || {},
+              stats: currentLocal?.stats || {}
+            });
+            if (syncRes && syncRes.student) {
+              me.xp = syncRes.student.xp;
+              me.level = syncRes.student.level;
+              me.streak = syncRes.student.streak;
+            }
+          } catch (e) {}
+        }
+
         const idx = this.state.students.findIndex(s => s.id === me.id);
         if (idx >= 0) {
           this.state.students[idx] = { ...this.state.students[idx], ...me };
@@ -228,9 +253,8 @@ class StateManager {
         }
         this.saveSession(me.id);
         this.notify('STUDENT_LOGGED_IN', me);
-      } else {
-        // If not authenticated on server, invalidate local session
-        this.state.currentStudentId = null;
+        this.notify('LEADERBOARD_UPDATED', this.state.students);
+      } else if (!this.state.currentStudentId) {
         this.saveSession(null);
         apiClient.clearToken();
       }
@@ -546,7 +570,8 @@ class StateManager {
       console.warn('Backend login fallback to local:', err.message);
     }
 
-    const student = backendStudent || this.state.students.find(s => s.email && s.email.toLowerCase() === cleanEmail);
+    const localExisting = this.state.students.find(s => (backendStudent && s.id === backendStudent.id) || (s.email && s.email.toLowerCase() === cleanEmail));
+    const student = backendStudent || localExisting;
     if (!student) {
       throw new Error('No student account found with this email. Please check your spelling or register under "New Student Join".');
     }
@@ -561,6 +586,24 @@ class StateManager {
         const salt = generateSalt();
         student.passwordSalt = salt;
         student.passwordHash = await hashPassword(password, salt);
+      }
+    } else if (localExisting && (Number(localExisting.xp) || 0) > (Number(backendStudent.xp) || 0)) {
+      try {
+        const syncRes = await apiClient.syncStudent({
+          xp: Number(localExisting.xp) || 0,
+          streak: Math.max(Number(localExisting.streak) || 0, Number(backendStudent.streak) || 0),
+          level: Math.max(Number(localExisting.level) || 1, Number(backendStudent.level) || 1),
+          topicProgress: localExisting.topicProgress || {},
+          roleplayProgress: localExisting.roleplayProgress || {},
+          stats: localExisting.stats || {}
+        });
+        if (syncRes && syncRes.student) {
+          student.xp = syncRes.student.xp;
+          student.level = syncRes.student.level;
+          student.streak = syncRes.student.streak;
+        }
+      } catch (syncErr) {
+        console.warn('Sync on login failed:', syncErr);
       }
     }
 
@@ -577,6 +620,7 @@ class StateManager {
 
     sound.playSuccess();
     this.notify('STUDENT_LOGGED_IN', student);
+    this.notify('LEADERBOARD_UPDATED', this.state.students);
     return student;
   }
 
@@ -653,6 +697,26 @@ class StateManager {
 
     this.checkAchievements(student);
     this.notify('XP_GAINED', { student, amount, activityType });
+
+    // Asynchronously synchronize XP to Turso cloud database & broadcast to other devices
+    if (this.state.currentStudentId) {
+      apiClient.recordXP({
+        amount,
+        activityType,
+        idempotencyKey: `xp_${student.id}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+      }).then(res => {
+        if (res && res.student && res.student.xp !== undefined) {
+          student.xp = res.student.xp;
+          student.level = res.student.level || student.level;
+          const idx = this.state.students.findIndex(s => s.id === student.id);
+          if (idx >= 0) this.state.students[idx] = { ...this.state.students[idx], ...student };
+          this.saveState();
+          this.notify('LEADERBOARD_UPDATED', this.state.students);
+        }
+      }).catch(err => {
+        console.warn('Background XP sync notice:', err.message);
+      });
+    }
   }
 
   updateDailyStreak(student) {
