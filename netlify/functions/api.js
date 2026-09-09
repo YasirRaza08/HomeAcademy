@@ -88,15 +88,24 @@ async function handleLambdaEvent(event = {}, context) {
       end(data) {
         if (data) responseChunks.push(typeof data === 'string' ? data : data.toString());
         const multiValueHeaders = {};
-        if (responseHeaders['set-cookie']) {
-          const cookieVal = responseHeaders['set-cookie'];
-          multiValueHeaders['Set-Cookie'] = Array.isArray(cookieVal) ? cookieVal : [cookieVal];
-          responseHeaders['Set-Cookie'] = Array.isArray(cookieVal) ? cookieVal[0] : cookieVal;
+        const cleanHeaders = {};
+
+        for (const [k, v] of Object.entries(responseHeaders)) {
+          if (k.toLowerCase() === 'set-cookie') {
+            const list = Array.isArray(v) ? v : [v];
+            multiValueHeaders['Set-Cookie'] = list;
+            if (list.length === 1) {
+              cleanHeaders['Set-Cookie'] = list[0];
+            }
+          } else {
+            cleanHeaders[k] = Array.isArray(v) ? v.join(', ') : String(v);
+          }
         }
+
         resolve({
           statusCode,
-          headers: responseHeaders,
-          multiValueHeaders,
+          headers: cleanHeaders,
+          multiValueHeaders: Object.keys(multiValueHeaders).length > 0 ? multiValueHeaders : undefined,
           body: responseChunks.join('')
         });
       }
