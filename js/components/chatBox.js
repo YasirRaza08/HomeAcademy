@@ -179,6 +179,17 @@ class ChatBox {
           font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
+        @media (max-width: 768px) {
+          #ha-chat-widget {
+            bottom: 74px !important;
+            right: 14px !important;
+          }
+          .chat-window-panel {
+            width: calc(100vw - 28px) !important;
+            height: 70vh !important;
+          }
+        }
+
         .chat-fab-button {
           display: flex;
           align-items: center;

@@ -24,8 +24,12 @@ function ensureDatabaseInitialized() {
  * Universal Handler: Supports both Netlify V1 (AWS Lambda event) and Netlify V2 (Web Request)
  */
 export const handler = async (eventOrRequest, context) => {
-  // Ensure DB migration in background
-  ensureDatabaseInitialized().catch(() => {});
+  // Ensure DB migration and schema initialization are fully completed before executing API requests
+  try {
+    await ensureDatabaseInitialized();
+  } catch (err) {
+    console.warn('[Home Academy] DB init notice:', err.message);
+  }
 
   // Detection: Web API standard Request (Netlify Functions v2)
   if (eventOrRequest && typeof eventOrRequest.text === 'function' && typeof eventOrRequest.url === 'string') {
