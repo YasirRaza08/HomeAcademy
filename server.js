@@ -2,15 +2,11 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { handleApiRequest } from './server/apiRouter.js';
 import { initDatabase } from './data/db.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const PORT = process.env.PORT || 3000;
-const BASE_DIR = __dirname;
+const BASE_DIR = process.cwd();
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',

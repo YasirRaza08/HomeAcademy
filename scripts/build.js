@@ -2,11 +2,8 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = process.cwd();
 
 console.log('--- BUILDING HOME ACADEMY FOR PRODUCTION ---');
 

@@ -5,7 +5,6 @@
 import { createClient } from '@libsql/client';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
@@ -14,12 +13,11 @@ import { OFFICIAL_TOPICS } from '../js/data/curriculum.js';
 import { OFFICIAL_ROLEPLAYS } from '../js/data/roleplay-data.js';
 import { TOPIC_QUESTION_BANKS } from '../js/data/topic-activities.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const DB_DIR = path.resolve(__dirname);
+const DB_DIR = path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+  try {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+  } catch (e) {}
 }
 
 export const DB_PATH = process.env.DATABASE_PATH || path.join(DB_DIR, 'home_academy.db');
