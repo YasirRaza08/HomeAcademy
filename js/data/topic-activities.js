@@ -1361,15 +1361,39 @@ export function shuffleQuestion(question) {
     return { ...question };
   }
   const originalOptions = question.options;
-  const correctOptionText = originalOptions[question.answer];
+  let correctOptionText = '';
+
+  if (typeof question.answer === 'number' && originalOptions[question.answer] !== undefined) {
+    correctOptionText = originalOptions[question.answer];
+  } else if (typeof question.answer === 'string') {
+    correctOptionText = question.answer;
+  } else if (typeof question.correct === 'number' && originalOptions[question.correct] !== undefined) {
+    correctOptionText = originalOptions[question.correct];
+  } else if (typeof question.correct === 'string') {
+    correctOptionText = question.correct;
+  } else if (typeof question.correctAnswer === 'string') {
+    correctOptionText = question.correctAnswer;
+  } else if (typeof question.correctAnswer === 'number' && originalOptions[question.correctAnswer] !== undefined) {
+    correctOptionText = originalOptions[question.correctAnswer];
+  }
 
   const shuffledOptions = shuffleArray(originalOptions);
-  const newAnswerIndex = shuffledOptions.indexOf(correctOptionText);
+  let newAnswerIndex = -1;
+  if (correctOptionText) {
+    newAnswerIndex = shuffledOptions.findIndex(
+      opt => String(opt).trim().toLowerCase() === String(correctOptionText).trim().toLowerCase()
+    );
+  }
+
+  const resolvedIndex = newAnswerIndex !== -1 ? newAnswerIndex : (typeof question.answer === 'number' ? question.answer : 0);
+  const resolvedText = correctOptionText || shuffledOptions[resolvedIndex] || shuffledOptions[0];
 
   return {
     ...question,
     options: shuffledOptions,
-    answer: newAnswerIndex !== -1 ? newAnswerIndex : question.answer
+    answer: resolvedIndex,
+    correct: resolvedIndex,
+    correctAnswer: resolvedText
   };
 }
 

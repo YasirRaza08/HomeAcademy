@@ -284,46 +284,70 @@ export function renderFullTest(container, onNavigate) {
 
     optButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        optButtons.forEach(b => b.disabled = true);
-        const chosenIdx = parseInt(btn.dataset.index);
-        const chosenText = btn.dataset.text;
-        const isCorrect = chosenIdx === q.answer;
+        try {
+          optButtons.forEach(b => b.disabled = true);
+          const chosenIdx = parseInt(btn.dataset.index, 10);
+          const chosenText = btn.dataset.text || '';
 
-        userAnswers.push({
-          questionId: q.id,
-          topicId: q.topicId,
-          topicTitle: q.topicTitle,
-          topicIcon: q.topicIcon,
-          question: q.question,
-          chosenText,
-          correctText: q.options[q.answer],
-          isCorrect,
-          explanation: q.explanation
-        });
+          let isCorrect = false;
+          let correctText = '';
 
-        if (isCorrect) {
-          sound.playCorrect();
-          btn.style.borderColor = 'var(--ha-success)';
-          btn.style.background = 'var(--ha-success-bg)';
-          btn.style.color = 'var(--ha-success)';
-          feedbackBox.style.background = 'var(--ha-success-bg)';
-          feedbackBox.style.color = '#065F46';
-          feedbackBox.style.border = '1px solid var(--ha-success)';
-          feedbackTitle.innerHTML = '🎉 Correct!';
-        } else {
-          sound.playWrong();
-          btn.style.borderColor = 'var(--ha-error)';
-          btn.style.background = 'var(--ha-red-light)';
-          btn.style.color = 'var(--ha-red)';
-          feedbackBox.style.background = 'var(--ha-red-light)';
-          feedbackBox.style.color = '#991B1B';
-          feedbackBox.style.border = '1px solid var(--ha-red)';
-          feedbackTitle.innerHTML = `❌ Incorrect (Correct: "${q.options[q.answer]}")`;
+          if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+            isCorrect = chosenIdx === q.answer;
+            correctText = q.options[q.answer];
+          } else if (typeof q.answer === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+            correctText = q.answer;
+          } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+            isCorrect = chosenIdx === q.correct;
+            correctText = q.options[q.correct];
+          } else if (typeof q.correct === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+            correctText = q.correct;
+          } else if (q.options && q.options.length > 0) {
+            isCorrect = chosenIdx === 0;
+            correctText = q.options[0];
+          }
+
+          userAnswers.push({
+            questionId: q.id,
+            topicId: q.topicId,
+            topicTitle: q.topicTitle,
+            topicIcon: q.topicIcon,
+            question: q.question,
+            chosenText,
+            correctText,
+            isCorrect,
+            explanation: q.explanation
+          });
+
+          if (isCorrect) {
+            sound.playCorrect();
+            btn.style.borderColor = 'var(--ha-success)';
+            btn.style.background = 'var(--ha-success-bg)';
+            btn.style.color = 'var(--ha-success)';
+            feedbackBox.style.background = 'var(--ha-success-bg)';
+            feedbackBox.style.color = '#065F46';
+            feedbackBox.style.border = '1px solid var(--ha-success)';
+            feedbackTitle.innerHTML = '🎉 Correct!';
+          } else {
+            sound.playWrong();
+            btn.style.borderColor = 'var(--ha-error)';
+            btn.style.background = 'var(--ha-red-light)';
+            btn.style.color = 'var(--ha-red)';
+            feedbackBox.style.background = 'var(--ha-red-light)';
+            feedbackBox.style.color = '#991B1B';
+            feedbackBox.style.border = '1px solid var(--ha-red)';
+            feedbackTitle.innerHTML = `❌ Incorrect (Correct: "${correctText}")`;
+          }
+
+          feedbackText.textContent = q.explanation || '';
+          feedbackBox.style.display = 'block';
+          nextBtn.style.display = 'inline-flex';
+        } catch (err) {
+          console.error('[Full Test Click Error]:', err);
+          nextBtn.style.display = 'inline-flex';
         }
-
-        feedbackText.textContent = q.explanation || '';
-        feedbackBox.style.display = 'block';
-        nextBtn.style.display = 'inline-flex';
       });
     });
 

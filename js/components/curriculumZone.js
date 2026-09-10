@@ -583,37 +583,61 @@ export function renderCurriculumZone(container, onNavigate, initialTopicId = nul
 
     optButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        optButtons.forEach(b => b.disabled = true);
-        const chosenIdx = parseInt(btn.dataset.index);
-        const chosenText = btn.dataset.text;
+        try {
+          optButtons.forEach(b => b.disabled = true);
+          const chosenIdx = parseInt(btn.dataset.index, 10);
+          const chosenText = btn.dataset.text || '';
 
-        const isCorrect = q.type === 'fill' ? chosenText.toLowerCase() === q.answer.toLowerCase() : chosenIdx === q.answer;
+          // Determine correct answer safely without throwing TypeError
+          let isCorrect = false;
+          let correctText = '';
 
-        practiceAnswers.push({ question: q.question, chosen: chosenText, isCorrect });
+          if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+            isCorrect = chosenIdx === q.answer;
+            correctText = q.options[q.answer];
+          } else if (typeof q.answer === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+            correctText = q.answer;
+          } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+            isCorrect = chosenIdx === q.correct;
+            correctText = q.options[q.correct];
+          } else if (typeof q.correct === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+            correctText = q.correct;
+          } else if (q.options && q.options.length > 0) {
+            isCorrect = chosenIdx === 0;
+            correctText = q.options[0];
+          }
 
-        if (isCorrect) {
-          sound.playCorrect();
-          btn.style.borderColor = 'var(--ha-success)';
-          btn.style.background = 'var(--ha-success-bg)';
-          btn.style.color = 'var(--ha-success)';
-          feedbackBox.style.background = 'var(--ha-success-bg)';
-          feedbackBox.style.color = '#065F46';
-          feedbackBox.style.border = '1px solid var(--ha-success)';
-          feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct!`;
-        } else {
-          sound.playWrong();
-          btn.style.borderColor = 'var(--ha-error)';
-          btn.style.background = 'var(--ha-red-light)';
-          btn.style.color = 'var(--ha-red)';
-          feedbackBox.style.background = 'var(--ha-red-light)';
-          feedbackBox.style.color = '#991B1B';
-          feedbackBox.style.border = '1px solid var(--ha-red)';
-          feedbackTitle.innerHTML = `${infoIcon(18)} Not quite!`;
+          practiceAnswers.push({ question: q.question, chosen: chosenText, isCorrect });
+
+          if (isCorrect) {
+            sound.playCorrect();
+            btn.style.borderColor = 'var(--ha-success)';
+            btn.style.background = 'var(--ha-success-bg)';
+            btn.style.color = 'var(--ha-success)';
+            feedbackBox.style.background = 'var(--ha-success-bg)';
+            feedbackBox.style.color = '#065F46';
+            feedbackBox.style.border = '1px solid var(--ha-success)';
+            feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct!`;
+          } else {
+            sound.playWrong();
+            btn.style.borderColor = 'var(--ha-error)';
+            btn.style.background = 'var(--ha-red-light)';
+            btn.style.color = 'var(--ha-red)';
+            feedbackBox.style.background = 'var(--ha-red-light)';
+            feedbackBox.style.color = '#991B1B';
+            feedbackBox.style.border = '1px solid var(--ha-red)';
+            feedbackTitle.innerHTML = `${infoIcon(18)} Not quite! (Correct: "${correctText}")`;
+          }
+
+          feedbackText.textContent = q.explanation || '';
+          feedbackBox.style.display = 'block';
+          nextBtn.style.display = 'inline-flex';
+        } catch (err) {
+          console.error('[Practice Click Error]:', err);
+          nextBtn.style.display = 'inline-flex';
         }
-
-        feedbackText.textContent = q.explanation || '';
-        feedbackBox.style.display = 'block';
-        nextBtn.style.display = 'inline-flex';
       });
     });
 
@@ -723,42 +747,66 @@ export function renderCurriculumZone(container, onNavigate, initialTopicId = nul
 
     optButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        optButtons.forEach(b => b.disabled = true);
-        const chosenIdx = parseInt(btn.dataset.index);
-        const chosenText = btn.dataset.text;
-        const isCorrect = chosenIdx === q.answer;
+        try {
+          optButtons.forEach(b => b.disabled = true);
+          const chosenIdx = parseInt(btn.dataset.index, 10);
+          const chosenText = btn.dataset.text || '';
 
-        quizAnswers.push({
-          question: q.question,
-          chosen: chosenText,
-          correctText: q.options[q.answer],
-          isCorrect,
-          explanation: q.explanation
-        });
+          let isCorrect = false;
+          let correctText = '';
 
-        if (isCorrect) {
-          sound.playCorrect();
-          btn.style.borderColor = 'var(--ha-success)';
-          btn.style.background = 'var(--ha-success-bg)';
-          btn.style.color = 'var(--ha-success)';
-          feedbackBox.style.background = 'var(--ha-success-bg)';
-          feedbackBox.style.color = '#065F46';
-          feedbackBox.style.border = '1px solid var(--ha-success)';
-          feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct Answer!`;
-        } else {
-          sound.playWrong();
-          btn.style.borderColor = 'var(--ha-error)';
-          btn.style.background = 'var(--ha-red-light)';
-          btn.style.color = 'var(--ha-red)';
-          feedbackBox.style.background = 'var(--ha-red-light)';
-          feedbackBox.style.color = '#991B1B';
-          feedbackBox.style.border = '1px solid var(--ha-red)';
-          feedbackTitle.innerHTML = `${infoIcon(18)} Incorrect (Correct: "${q.options[q.answer]}")`;
+          if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+            isCorrect = chosenIdx === q.answer;
+            correctText = q.options[q.answer];
+          } else if (typeof q.answer === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+            correctText = q.answer;
+          } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+            isCorrect = chosenIdx === q.correct;
+            correctText = q.options[q.correct];
+          } else if (typeof q.correct === 'string') {
+            isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+            correctText = q.correct;
+          } else if (q.options && q.options.length > 0) {
+            isCorrect = chosenIdx === 0;
+            correctText = q.options[0];
+          }
+
+          quizAnswers.push({
+            question: q.question,
+            chosen: chosenText,
+            correctText,
+            isCorrect,
+            explanation: q.explanation
+          });
+
+          if (isCorrect) {
+            sound.playCorrect();
+            btn.style.borderColor = 'var(--ha-success)';
+            btn.style.background = 'var(--ha-success-bg)';
+            btn.style.color = 'var(--ha-success)';
+            feedbackBox.style.background = 'var(--ha-success-bg)';
+            feedbackBox.style.color = '#065F46';
+            feedbackBox.style.border = '1px solid var(--ha-success)';
+            feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct Answer!`;
+          } else {
+            sound.playWrong();
+            btn.style.borderColor = 'var(--ha-error)';
+            btn.style.background = 'var(--ha-red-light)';
+            btn.style.color = 'var(--ha-red)';
+            feedbackBox.style.background = 'var(--ha-red-light)';
+            feedbackBox.style.color = '#991B1B';
+            feedbackBox.style.border = '1px solid var(--ha-red)';
+            feedbackTitle.innerHTML = `${infoIcon(18)} Incorrect (Correct: "${correctText}")`;
+          }
+
+          feedbackText.textContent = q.explanation || '';
+          feedbackBox.style.display = 'block';
+          nextBtn.style.display = 'inline-flex';
+        } catch (err) {
+          console.error('[Quiz Click Error]:', err);
+          nextBtn.style.display = 'inline-flex';
         }
-
-        feedbackText.textContent = q.explanation || '';
-        feedbackBox.style.display = 'block';
-        nextBtn.style.display = 'inline-flex';
       });
     });
 

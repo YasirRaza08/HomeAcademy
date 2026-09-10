@@ -5979,30 +5979,52 @@
         const nextBtn = mount.querySelector("#btn-drill-next");
         optBtns.forEach((btn) => {
           btn.addEventListener("click", () => {
-            optBtns.forEach((b) => b.disabled = true);
-            const chosen = btn.dataset.text;
-            const chosenIdx = parseInt(btn.dataset.index);
-            const isCorrect = q.type === "fill" ? chosen.toLowerCase() === q.answer.toLowerCase() : chosenIdx === q.answer;
-            if (isCorrect) {
-              drillScore++;
-              sound.playCorrect();
-              btn.style.borderColor = "var(--ha-success)";
-              btn.style.background = "var(--ha-success-bg)";
-              btn.style.color = "var(--ha-success)";
-              feedback.style.background = "var(--ha-success-bg)";
-              feedback.style.color = "var(--ha-success)";
-              feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(16)} Correct!</span>`;
-            } else {
-              sound.playWrong();
-              btn.style.borderColor = "var(--ha-error)";
-              btn.style.background = "var(--ha-red-light)";
-              btn.style.color = "var(--ha-red)";
-              feedback.style.background = "var(--ha-red-light)";
-              feedback.style.color = "var(--ha-red)";
-              feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(16)} ${q.explanation || "Incorrect"}</span>`;
+            try {
+              optBtns.forEach((b) => b.disabled = true);
+              const chosen = btn.dataset.text || "";
+              const chosenIdx = parseInt(btn.dataset.index, 10);
+              let isCorrect = false;
+              let correctText = "";
+              if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+                isCorrect = chosenIdx === q.answer;
+                correctText = q.options[q.answer];
+              } else if (typeof q.answer === "string") {
+                isCorrect = chosen.trim().toLowerCase() === q.answer.trim().toLowerCase();
+                correctText = q.answer;
+              } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+                isCorrect = chosenIdx === q.correct;
+                correctText = q.options[q.correct];
+              } else if (typeof q.correct === "string") {
+                isCorrect = chosen.trim().toLowerCase() === q.correct.trim().toLowerCase();
+                correctText = q.correct;
+              } else if (q.options && q.options.length > 0) {
+                isCorrect = chosenIdx === 0;
+                correctText = q.options[0];
+              }
+              if (isCorrect) {
+                drillScore++;
+                sound.playCorrect();
+                btn.style.borderColor = "var(--ha-success)";
+                btn.style.background = "var(--ha-success-bg)";
+                btn.style.color = "var(--ha-success)";
+                feedback.style.background = "var(--ha-success-bg)";
+                feedback.style.color = "var(--ha-success)";
+                feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(16)} Correct!</span>`;
+              } else {
+                sound.playWrong();
+                btn.style.borderColor = "var(--ha-error)";
+                btn.style.background = "var(--ha-red-light)";
+                btn.style.color = "var(--ha-red)";
+                feedback.style.background = "var(--ha-red-light)";
+                feedback.style.color = "var(--ha-red)";
+                feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(16)} ${q.explanation || `Correct answer: "${correctText}"`}</span>`;
+              }
+              feedback.style.display = "block";
+              nextBtn.style.display = "inline-flex";
+            } catch (err) {
+              console.error("[Dashboard Drill Click Error]:", err);
+              nextBtn.style.display = "inline-flex";
             }
-            feedback.style.display = "block";
-            nextBtn.style.display = "inline-flex";
           });
         });
         nextBtn.addEventListener("click", () => {
@@ -7358,13 +7380,35 @@
       return { ...question };
     }
     const originalOptions = question.options;
-    const correctOptionText = originalOptions[question.answer];
+    let correctOptionText = "";
+    if (typeof question.answer === "number" && originalOptions[question.answer] !== void 0) {
+      correctOptionText = originalOptions[question.answer];
+    } else if (typeof question.answer === "string") {
+      correctOptionText = question.answer;
+    } else if (typeof question.correct === "number" && originalOptions[question.correct] !== void 0) {
+      correctOptionText = originalOptions[question.correct];
+    } else if (typeof question.correct === "string") {
+      correctOptionText = question.correct;
+    } else if (typeof question.correctAnswer === "string") {
+      correctOptionText = question.correctAnswer;
+    } else if (typeof question.correctAnswer === "number" && originalOptions[question.correctAnswer] !== void 0) {
+      correctOptionText = originalOptions[question.correctAnswer];
+    }
     const shuffledOptions = shuffleArray2(originalOptions);
-    const newAnswerIndex = shuffledOptions.indexOf(correctOptionText);
+    let newAnswerIndex = -1;
+    if (correctOptionText) {
+      newAnswerIndex = shuffledOptions.findIndex(
+        (opt) => String(opt).trim().toLowerCase() === String(correctOptionText).trim().toLowerCase()
+      );
+    }
+    const resolvedIndex = newAnswerIndex !== -1 ? newAnswerIndex : typeof question.answer === "number" ? question.answer : 0;
+    const resolvedText = correctOptionText || shuffledOptions[resolvedIndex] || shuffledOptions[0];
     return {
       ...question,
       options: shuffledOptions,
-      answer: newAnswerIndex !== -1 ? newAnswerIndex : question.answer
+      answer: resolvedIndex,
+      correct: resolvedIndex,
+      correctAnswer: resolvedText
     };
   }
   function getFreshQuestionsForTopic(topicId, seenIds = [], count = 5) {
@@ -8400,33 +8444,55 @@
       const nextBtn = container.querySelector("#btn-next-practice");
       optButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          optButtons.forEach((b) => b.disabled = true);
-          const chosenIdx = parseInt(btn.dataset.index);
-          const chosenText = btn.dataset.text;
-          const isCorrect = q.type === "fill" ? chosenText.toLowerCase() === q.answer.toLowerCase() : chosenIdx === q.answer;
-          practiceAnswers.push({ question: q.question, chosen: chosenText, isCorrect });
-          if (isCorrect) {
-            sound.playCorrect();
-            btn.style.borderColor = "var(--ha-success)";
-            btn.style.background = "var(--ha-success-bg)";
-            btn.style.color = "var(--ha-success)";
-            feedbackBox.style.background = "var(--ha-success-bg)";
-            feedbackBox.style.color = "#065F46";
-            feedbackBox.style.border = "1px solid var(--ha-success)";
-            feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct!`;
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = "var(--ha-error)";
-            btn.style.background = "var(--ha-red-light)";
-            btn.style.color = "var(--ha-red)";
-            feedbackBox.style.background = "var(--ha-red-light)";
-            feedbackBox.style.color = "#991B1B";
-            feedbackBox.style.border = "1px solid var(--ha-red)";
-            feedbackTitle.innerHTML = `${infoIcon(18)} Not quite!`;
+          try {
+            optButtons.forEach((b) => b.disabled = true);
+            const chosenIdx = parseInt(btn.dataset.index, 10);
+            const chosenText = btn.dataset.text || "";
+            let isCorrect = false;
+            let correctText = "";
+            if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+              isCorrect = chosenIdx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.answer === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+              isCorrect = chosenIdx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.correct === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+              correctText = q.correct;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = chosenIdx === 0;
+              correctText = q.options[0];
+            }
+            practiceAnswers.push({ question: q.question, chosen: chosenText, isCorrect });
+            if (isCorrect) {
+              sound.playCorrect();
+              btn.style.borderColor = "var(--ha-success)";
+              btn.style.background = "var(--ha-success-bg)";
+              btn.style.color = "var(--ha-success)";
+              feedbackBox.style.background = "var(--ha-success-bg)";
+              feedbackBox.style.color = "#065F46";
+              feedbackBox.style.border = "1px solid var(--ha-success)";
+              feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct!`;
+            } else {
+              sound.playWrong();
+              btn.style.borderColor = "var(--ha-error)";
+              btn.style.background = "var(--ha-red-light)";
+              btn.style.color = "var(--ha-red)";
+              feedbackBox.style.background = "var(--ha-red-light)";
+              feedbackBox.style.color = "#991B1B";
+              feedbackBox.style.border = "1px solid var(--ha-red)";
+              feedbackTitle.innerHTML = `${infoIcon(18)} Not quite! (Correct: "${correctText}")`;
+            }
+            feedbackText.textContent = q.explanation || "";
+            feedbackBox.style.display = "block";
+            nextBtn.style.display = "inline-flex";
+          } catch (err) {
+            console.error("[Practice Click Error]:", err);
+            nextBtn.style.display = "inline-flex";
           }
-          feedbackText.textContent = q.explanation || "";
-          feedbackBox.style.display = "block";
-          nextBtn.style.display = "inline-flex";
         });
       });
       nextBtn.addEventListener("click", () => {
@@ -8524,39 +8590,61 @@
       const nextBtn = container.querySelector("#btn-next-quiz");
       optButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          optButtons.forEach((b) => b.disabled = true);
-          const chosenIdx = parseInt(btn.dataset.index);
-          const chosenText = btn.dataset.text;
-          const isCorrect = chosenIdx === q.answer;
-          quizAnswers.push({
-            question: q.question,
-            chosen: chosenText,
-            correctText: q.options[q.answer],
-            isCorrect,
-            explanation: q.explanation
-          });
-          if (isCorrect) {
-            sound.playCorrect();
-            btn.style.borderColor = "var(--ha-success)";
-            btn.style.background = "var(--ha-success-bg)";
-            btn.style.color = "var(--ha-success)";
-            feedbackBox.style.background = "var(--ha-success-bg)";
-            feedbackBox.style.color = "#065F46";
-            feedbackBox.style.border = "1px solid var(--ha-success)";
-            feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct Answer!`;
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = "var(--ha-error)";
-            btn.style.background = "var(--ha-red-light)";
-            btn.style.color = "var(--ha-red)";
-            feedbackBox.style.background = "var(--ha-red-light)";
-            feedbackBox.style.color = "#991B1B";
-            feedbackBox.style.border = "1px solid var(--ha-red)";
-            feedbackTitle.innerHTML = `${infoIcon(18)} Incorrect (Correct: "${q.options[q.answer]}")`;
+          try {
+            optButtons.forEach((b) => b.disabled = true);
+            const chosenIdx = parseInt(btn.dataset.index, 10);
+            const chosenText = btn.dataset.text || "";
+            let isCorrect = false;
+            let correctText = "";
+            if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+              isCorrect = chosenIdx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.answer === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+              isCorrect = chosenIdx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.correct === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+              correctText = q.correct;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = chosenIdx === 0;
+              correctText = q.options[0];
+            }
+            quizAnswers.push({
+              question: q.question,
+              chosen: chosenText,
+              correctText,
+              isCorrect,
+              explanation: q.explanation
+            });
+            if (isCorrect) {
+              sound.playCorrect();
+              btn.style.borderColor = "var(--ha-success)";
+              btn.style.background = "var(--ha-success-bg)";
+              btn.style.color = "var(--ha-success)";
+              feedbackBox.style.background = "var(--ha-success-bg)";
+              feedbackBox.style.color = "#065F46";
+              feedbackBox.style.border = "1px solid var(--ha-success)";
+              feedbackTitle.innerHTML = `${checkCircleIcon(18)} Correct Answer!`;
+            } else {
+              sound.playWrong();
+              btn.style.borderColor = "var(--ha-error)";
+              btn.style.background = "var(--ha-red-light)";
+              btn.style.color = "var(--ha-red)";
+              feedbackBox.style.background = "var(--ha-red-light)";
+              feedbackBox.style.color = "#991B1B";
+              feedbackBox.style.border = "1px solid var(--ha-red)";
+              feedbackTitle.innerHTML = `${infoIcon(18)} Incorrect (Correct: "${correctText}")`;
+            }
+            feedbackText.textContent = q.explanation || "";
+            feedbackBox.style.display = "block";
+            nextBtn.style.display = "inline-flex";
+          } catch (err) {
+            console.error("[Quiz Click Error]:", err);
+            nextBtn.style.display = "inline-flex";
           }
-          feedbackText.textContent = q.explanation || "";
-          feedbackBox.style.display = "block";
-          nextBtn.style.display = "inline-flex";
         });
       });
       nextBtn.addEventListener("click", () => {
@@ -12849,43 +12937,65 @@
       const nextBtn = container.querySelector("#btn-next-ft-question");
       optButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          optButtons.forEach((b) => b.disabled = true);
-          const chosenIdx = parseInt(btn.dataset.index);
-          const chosenText = btn.dataset.text;
-          const isCorrect = chosenIdx === q.answer;
-          userAnswers.push({
-            questionId: q.id,
-            topicId: q.topicId,
-            topicTitle: q.topicTitle,
-            topicIcon: q.topicIcon,
-            question: q.question,
-            chosenText,
-            correctText: q.options[q.answer],
-            isCorrect,
-            explanation: q.explanation
-          });
-          if (isCorrect) {
-            sound.playCorrect();
-            btn.style.borderColor = "var(--ha-success)";
-            btn.style.background = "var(--ha-success-bg)";
-            btn.style.color = "var(--ha-success)";
-            feedbackBox.style.background = "var(--ha-success-bg)";
-            feedbackBox.style.color = "#065F46";
-            feedbackBox.style.border = "1px solid var(--ha-success)";
-            feedbackTitle.innerHTML = "\u{1F389} Correct!";
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = "var(--ha-error)";
-            btn.style.background = "var(--ha-red-light)";
-            btn.style.color = "var(--ha-red)";
-            feedbackBox.style.background = "var(--ha-red-light)";
-            feedbackBox.style.color = "#991B1B";
-            feedbackBox.style.border = "1px solid var(--ha-red)";
-            feedbackTitle.innerHTML = `\u274C Incorrect (Correct: "${q.options[q.answer]}")`;
+          try {
+            optButtons.forEach((b) => b.disabled = true);
+            const chosenIdx = parseInt(btn.dataset.index, 10);
+            const chosenText = btn.dataset.text || "";
+            let isCorrect = false;
+            let correctText = "";
+            if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+              isCorrect = chosenIdx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.answer === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.answer.trim().toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+              isCorrect = chosenIdx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.correct === "string") {
+              isCorrect = chosenText.trim().toLowerCase() === q.correct.trim().toLowerCase();
+              correctText = q.correct;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = chosenIdx === 0;
+              correctText = q.options[0];
+            }
+            userAnswers.push({
+              questionId: q.id,
+              topicId: q.topicId,
+              topicTitle: q.topicTitle,
+              topicIcon: q.topicIcon,
+              question: q.question,
+              chosenText,
+              correctText,
+              isCorrect,
+              explanation: q.explanation
+            });
+            if (isCorrect) {
+              sound.playCorrect();
+              btn.style.borderColor = "var(--ha-success)";
+              btn.style.background = "var(--ha-success-bg)";
+              btn.style.color = "var(--ha-success)";
+              feedbackBox.style.background = "var(--ha-success-bg)";
+              feedbackBox.style.color = "#065F46";
+              feedbackBox.style.border = "1px solid var(--ha-success)";
+              feedbackTitle.innerHTML = "\u{1F389} Correct!";
+            } else {
+              sound.playWrong();
+              btn.style.borderColor = "var(--ha-error)";
+              btn.style.background = "var(--ha-red-light)";
+              btn.style.color = "var(--ha-red)";
+              feedbackBox.style.background = "var(--ha-red-light)";
+              feedbackBox.style.color = "#991B1B";
+              feedbackBox.style.border = "1px solid var(--ha-red)";
+              feedbackTitle.innerHTML = `\u274C Incorrect (Correct: "${correctText}")`;
+            }
+            feedbackText.textContent = q.explanation || "";
+            feedbackBox.style.display = "block";
+            nextBtn.style.display = "inline-flex";
+          } catch (err) {
+            console.error("[Full Test Click Error]:", err);
+            nextBtn.style.display = "inline-flex";
           }
-          feedbackText.textContent = q.explanation || "";
-          feedbackBox.style.display = "block";
-          nextBtn.style.display = "inline-flex";
         });
       });
       nextBtn.addEventListener("click", () => {
@@ -13578,29 +13688,55 @@
         const nextBtn = container.querySelector("#btn-fill-next");
         optBtns.forEach((btn) => {
           btn.addEventListener("click", () => {
-            const idx = parseInt(btn.dataset.idx, 10);
-            const isCorrect = idx === q.correct;
-            optBtns.forEach((b) => b.disabled = true);
-            if (isCorrect) {
-              sound.playCorrect();
-              score++;
-              btn.style.background = "var(--ha-success-bg)";
-              btn.style.borderColor = "var(--ha-success)";
-              btn.style.color = "#065F46";
-              feedback.style.background = "var(--ha-success-bg)";
-              feedback.style.color = "#065F46";
-              feedback.innerHTML = `\u{1F389} Correct! ${q.explanation || ""}`;
-            } else {
-              sound.playWrong();
-              btn.style.background = "#FEF2F2";
-              btn.style.borderColor = "var(--ha-error)";
-              btn.style.color = "var(--ha-error)";
-              feedback.style.background = "#FEF2F2";
-              feedback.style.color = "var(--ha-error)";
-              feedback.innerHTML = `\u274C Incorrect. The correct answer is "${q.options[q.correct]}". ${q.explanation || ""}`;
+            try {
+              const idx = parseInt(btn.dataset.idx, 10);
+              const chosenText = btn.textContent.trim();
+              let isCorrect = false;
+              let correctText = "";
+              if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+                isCorrect = idx === q.answer;
+                correctText = q.options[q.answer];
+              } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+                isCorrect = idx === q.correct;
+                correctText = q.options[q.correct];
+              } else if (typeof q.answer === "string") {
+                isCorrect = chosenText.toLowerCase() === q.answer.toLowerCase();
+                correctText = q.answer;
+              } else if (typeof q.correct === "string") {
+                isCorrect = chosenText.toLowerCase() === q.correct.toLowerCase();
+                correctText = q.correct;
+              } else if (typeof q.correctAnswer === "string") {
+                isCorrect = chosenText.toLowerCase() === q.correctAnswer.toLowerCase();
+                correctText = q.correctAnswer;
+              } else if (q.options && q.options.length > 0) {
+                isCorrect = idx === 0;
+                correctText = q.options[0];
+              }
+              optBtns.forEach((b) => b.disabled = true);
+              if (isCorrect) {
+                sound.playCorrect();
+                score++;
+                btn.style.background = "var(--ha-success-bg)";
+                btn.style.borderColor = "var(--ha-success)";
+                btn.style.color = "#065F46";
+                feedback.style.background = "var(--ha-success-bg)";
+                feedback.style.color = "#065F46";
+                feedback.innerHTML = `\u{1F389} Correct! ${q.explanation || ""}`;
+              } else {
+                sound.playWrong();
+                btn.style.background = "#FEF2F2";
+                btn.style.borderColor = "var(--ha-error)";
+                btn.style.color = "var(--ha-error)";
+                feedback.style.background = "#FEF2F2";
+                feedback.style.color = "var(--ha-error)";
+                feedback.innerHTML = `\u274C Incorrect. The correct answer is "${correctText}". ${q.explanation || ""}`;
+              }
+              feedback.style.display = "block";
+              nextBtn.style.display = "inline-flex";
+            } catch (err) {
+              console.error("[Fill Click Error]:", err);
+              nextBtn.style.display = "inline-flex";
             }
-            feedback.style.display = "block";
-            nextBtn.style.display = "inline-flex";
           });
         });
         nextBtn?.addEventListener("click", () => {
@@ -13821,29 +13957,55 @@
         const nextBtn = container.querySelector("#btn-mcq-next");
         optBtns.forEach((btn) => {
           btn.addEventListener("click", () => {
-            const idx = parseInt(btn.dataset.idx, 10);
-            const isCorrect = idx === q.correct;
-            optBtns.forEach((b) => b.disabled = true);
-            if (isCorrect) {
-              sound.playCorrect();
-              score++;
-              btn.style.background = "var(--ha-success-bg)";
-              btn.style.borderColor = "var(--ha-success)";
-              btn.style.color = "#065F46";
-              feedback.style.background = "var(--ha-success-bg)";
-              feedback.style.color = "#065F46";
-              feedback.innerHTML = `\u{1F389} Correct! ${q.explanation || ""}`;
-            } else {
-              sound.playWrong();
-              btn.style.background = "#FEF2F2";
-              btn.style.borderColor = "var(--ha-error)";
-              btn.style.color = "var(--ha-error)";
-              feedback.style.background = "#FEF2F2";
-              feedback.style.color = "var(--ha-error)";
-              feedback.innerHTML = `\u274C Incorrect. The correct option is "${q.options[q.correct]}". ${q.explanation || ""}`;
+            try {
+              const idx = parseInt(btn.dataset.idx, 10);
+              const chosenText = (btn.textContent || "").replace(/^[A-Z]\.\s*/, "").trim();
+              let isCorrect = false;
+              let correctText = "";
+              if (typeof q.answer === "number" && q.options && q.options[q.answer] !== void 0) {
+                isCorrect = idx === q.answer;
+                correctText = q.options[q.answer];
+              } else if (typeof q.correct === "number" && q.options && q.options[q.correct] !== void 0) {
+                isCorrect = idx === q.correct;
+                correctText = q.options[q.correct];
+              } else if (typeof q.answer === "string") {
+                isCorrect = chosenText.toLowerCase() === q.answer.toLowerCase();
+                correctText = q.answer;
+              } else if (typeof q.correct === "string") {
+                isCorrect = chosenText.toLowerCase() === q.correct.toLowerCase();
+                correctText = q.correct;
+              } else if (typeof q.correctAnswer === "string") {
+                isCorrect = chosenText.toLowerCase() === q.correctAnswer.toLowerCase();
+                correctText = q.correctAnswer;
+              } else if (q.options && q.options.length > 0) {
+                isCorrect = idx === 0;
+                correctText = q.options[0];
+              }
+              optBtns.forEach((b) => b.disabled = true);
+              if (isCorrect) {
+                sound.playCorrect();
+                score++;
+                btn.style.background = "var(--ha-success-bg)";
+                btn.style.borderColor = "var(--ha-success)";
+                btn.style.color = "#065F46";
+                feedback.style.background = "var(--ha-success-bg)";
+                feedback.style.color = "#065F46";
+                feedback.innerHTML = `\u{1F389} Correct! ${q.explanation || ""}`;
+              } else {
+                sound.playWrong();
+                btn.style.background = "#FEF2F2";
+                btn.style.borderColor = "var(--ha-error)";
+                btn.style.color = "var(--ha-error)";
+                feedback.style.background = "#FEF2F2";
+                feedback.style.color = "var(--ha-error)";
+                feedback.innerHTML = `\u274C Incorrect. The correct option is "${correctText}". ${q.explanation || ""}`;
+              }
+              feedback.style.display = "block";
+              nextBtn.style.display = "inline-flex";
+            } catch (err) {
+              console.error("[MCQ Click Error]:", err);
+              nextBtn.style.display = "inline-flex";
             }
-            feedback.style.display = "block";
-            nextBtn.style.display = "inline-flex";
           });
         });
         nextBtn?.addEventListener("click", () => {

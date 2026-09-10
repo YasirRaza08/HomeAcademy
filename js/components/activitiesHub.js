@@ -494,32 +494,60 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
 
       optBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-          const idx = parseInt(btn.dataset.idx, 10);
-          const isCorrect = idx === q.correct;
+          try {
+            const idx = parseInt(btn.dataset.idx, 10);
+            const chosenText = btn.textContent.trim();
 
-          optBtns.forEach(b => b.disabled = true);
+            let isCorrect = false;
+            let correctText = '';
 
-          if (isCorrect) {
-            sound.playCorrect();
-            score++;
-            btn.style.background = 'var(--ha-success-bg)';
-            btn.style.borderColor = 'var(--ha-success)';
-            btn.style.color = '#065F46';
-            feedback.style.background = 'var(--ha-success-bg)';
-            feedback.style.color = '#065F46';
-            feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
-          } else {
-            sound.playWrong();
-            btn.style.background = '#FEF2F2';
-            btn.style.borderColor = 'var(--ha-error)';
-            btn.style.color = 'var(--ha-error)';
-            feedback.style.background = '#FEF2F2';
-            feedback.style.color = 'var(--ha-error)';
-            feedback.innerHTML = `❌ Incorrect. The correct answer is "${q.options[q.correct]}". ${q.explanation || ''}`;
+            if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+              isCorrect = idx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+              isCorrect = idx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.answer === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.answer.toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.correct.toLowerCase();
+              correctText = q.correct;
+            } else if (typeof q.correctAnswer === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.correctAnswer.toLowerCase();
+              correctText = q.correctAnswer;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = idx === 0;
+              correctText = q.options[0];
+            }
+
+            optBtns.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+              sound.playCorrect();
+              score++;
+              btn.style.background = 'var(--ha-success-bg)';
+              btn.style.borderColor = 'var(--ha-success)';
+              btn.style.color = '#065F46';
+              feedback.style.background = 'var(--ha-success-bg)';
+              feedback.style.color = '#065F46';
+              feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
+            } else {
+              sound.playWrong();
+              btn.style.background = '#FEF2F2';
+              btn.style.borderColor = 'var(--ha-error)';
+              btn.style.color = 'var(--ha-error)';
+              feedback.style.background = '#FEF2F2';
+              feedback.style.color = 'var(--ha-error)';
+              feedback.innerHTML = `❌ Incorrect. The correct answer is "${correctText}". ${q.explanation || ''}`;
+            }
+
+            feedback.style.display = 'block';
+            nextBtn.style.display = 'inline-flex';
+          } catch (err) {
+            console.error('[Fill Click Error]:', err);
+            nextBtn.style.display = 'inline-flex';
           }
-
-          feedback.style.display = 'block';
-          nextBtn.style.display = 'inline-flex';
         });
       });
 
@@ -769,32 +797,60 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
 
       optBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-          const idx = parseInt(btn.dataset.idx, 10);
-          const isCorrect = idx === q.correct;
+          try {
+            const idx = parseInt(btn.dataset.idx, 10);
+            const chosenText = (btn.textContent || '').replace(/^[A-Z]\.\s*/, '').trim();
 
-          optBtns.forEach(b => b.disabled = true);
+            let isCorrect = false;
+            let correctText = '';
 
-          if (isCorrect) {
-            sound.playCorrect();
-            score++;
-            btn.style.background = 'var(--ha-success-bg)';
-            btn.style.borderColor = 'var(--ha-success)';
-            btn.style.color = '#065F46';
-            feedback.style.background = 'var(--ha-success-bg)';
-            feedback.style.color = '#065F46';
-            feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
-          } else {
-            sound.playWrong();
-            btn.style.background = '#FEF2F2';
-            btn.style.borderColor = 'var(--ha-error)';
-            btn.style.color = 'var(--ha-error)';
-            feedback.style.background = '#FEF2F2';
-            feedback.style.color = 'var(--ha-error)';
-            feedback.innerHTML = `❌ Incorrect. The correct option is "${q.options[q.correct]}". ${q.explanation || ''}`;
+            if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+              isCorrect = idx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+              isCorrect = idx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.answer === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.answer.toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.correct.toLowerCase();
+              correctText = q.correct;
+            } else if (typeof q.correctAnswer === 'string') {
+              isCorrect = chosenText.toLowerCase() === q.correctAnswer.toLowerCase();
+              correctText = q.correctAnswer;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = idx === 0;
+              correctText = q.options[0];
+            }
+
+            optBtns.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+              sound.playCorrect();
+              score++;
+              btn.style.background = 'var(--ha-success-bg)';
+              btn.style.borderColor = 'var(--ha-success)';
+              btn.style.color = '#065F46';
+              feedback.style.background = 'var(--ha-success-bg)';
+              feedback.style.color = '#065F46';
+              feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
+            } else {
+              sound.playWrong();
+              btn.style.background = '#FEF2F2';
+              btn.style.borderColor = 'var(--ha-error)';
+              btn.style.color = 'var(--ha-error)';
+              feedback.style.background = '#FEF2F2';
+              feedback.style.color = 'var(--ha-error)';
+              feedback.innerHTML = `❌ Incorrect. The correct option is "${correctText}". ${q.explanation || ''}`;
+            }
+
+            feedback.style.display = 'block';
+            nextBtn.style.display = 'inline-flex';
+          } catch (err) {
+            console.error('[MCQ Click Error]:', err);
+            nextBtn.style.display = 'inline-flex';
           }
-
-          feedback.style.display = 'block';
-          nextBtn.style.display = 'inline-flex';
         });
       });
 

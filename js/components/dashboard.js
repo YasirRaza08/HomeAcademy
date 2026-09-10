@@ -775,32 +775,56 @@ export function renderDashboard(container, onNavigate) {
 
       optBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-          optBtns.forEach(b => b.disabled = true);
-          const chosen = btn.dataset.text;
-          const chosenIdx = parseInt(btn.dataset.index);
-          const isCorrect = q.type === 'fill' ? chosen.toLowerCase() === q.answer.toLowerCase() : chosenIdx === q.answer;
+          try {
+            optBtns.forEach(b => b.disabled = true);
+            const chosen = btn.dataset.text || '';
+            const chosenIdx = parseInt(btn.dataset.index, 10);
 
-          if (isCorrect) {
-            drillScore++;
-            sound.playCorrect();
-            btn.style.borderColor = 'var(--ha-success)';
-            btn.style.background = 'var(--ha-success-bg)';
-            btn.style.color = 'var(--ha-success)';
-            feedback.style.background = 'var(--ha-success-bg)';
-            feedback.style.color = 'var(--ha-success)';
-            feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(16)} Correct!</span>`;
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = 'var(--ha-error)';
-            btn.style.background = 'var(--ha-red-light)';
-            btn.style.color = 'var(--ha-red)';
-            feedback.style.background = 'var(--ha-red-light)';
-            feedback.style.color = 'var(--ha-red)';
-            feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(16)} ${q.explanation || 'Incorrect'}</span>`;
+            let isCorrect = false;
+            let correctText = '';
+
+            if (typeof q.answer === 'number' && q.options && q.options[q.answer] !== undefined) {
+              isCorrect = chosenIdx === q.answer;
+              correctText = q.options[q.answer];
+            } else if (typeof q.answer === 'string') {
+              isCorrect = chosen.trim().toLowerCase() === q.answer.trim().toLowerCase();
+              correctText = q.answer;
+            } else if (typeof q.correct === 'number' && q.options && q.options[q.correct] !== undefined) {
+              isCorrect = chosenIdx === q.correct;
+              correctText = q.options[q.correct];
+            } else if (typeof q.correct === 'string') {
+              isCorrect = chosen.trim().toLowerCase() === q.correct.trim().toLowerCase();
+              correctText = q.correct;
+            } else if (q.options && q.options.length > 0) {
+              isCorrect = chosenIdx === 0;
+              correctText = q.options[0];
+            }
+
+            if (isCorrect) {
+              drillScore++;
+              sound.playCorrect();
+              btn.style.borderColor = 'var(--ha-success)';
+              btn.style.background = 'var(--ha-success-bg)';
+              btn.style.color = 'var(--ha-success)';
+              feedback.style.background = 'var(--ha-success-bg)';
+              feedback.style.color = 'var(--ha-success)';
+              feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(16)} Correct!</span>`;
+            } else {
+              sound.playWrong();
+              btn.style.borderColor = 'var(--ha-error)';
+              btn.style.background = 'var(--ha-red-light)';
+              btn.style.color = 'var(--ha-red)';
+              feedback.style.background = 'var(--ha-red-light)';
+              feedback.style.color = 'var(--ha-red)';
+              feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(16)} ${q.explanation || `Correct answer: "${correctText}"`}</span>`;
+            }
+
+            feedback.style.display = 'block';
+            nextBtn.style.display = 'inline-flex';
+          } catch (err) {
+            console.error('[Dashboard Drill Click Error]:', err);
+            nextBtn.style.display = 'inline-flex';
           }
-
-          feedback.style.display = 'block';
-          nextBtn.style.display = 'inline-flex';
         });
       });
 
