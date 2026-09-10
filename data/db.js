@@ -856,6 +856,56 @@ export async function getStudentDetailedProfile(studentId) {
 }
 
 // --------------------------------------------------------------------------
+// STUDENT TEST HISTORY (ISOLATED PER STUDENT)
+// --------------------------------------------------------------------------
+export async function getStudentTestHistory(studentId) {
+  const activeClient = getClient();
+  const res = await activeClient.execute({
+    sql: `SELECT attempt_id, student_id, quiz_id, topic_id, score, total_questions, correct_answers, incorrect_answers, percentage, passed, xp_earned, completed_at
+          FROM quiz_attempts
+          WHERE student_id = ?
+          ORDER BY completed_at DESC`,
+    args: [studentId]
+  });
+  return res.rows;
+}
+
+// --------------------------------------------------------------------------
+// ALL TEST RESULTS & SUMMARY METRICS (FOR TEACHER / ADMIN PORTAL)
+// --------------------------------------------------------------------------
+export async function getAllTestResults() {
+  const activeClient = getClient();
+  const [statsRes, attemptsRes] = await Promise.all([
+    activeClient.execute({
+      sql: `SELECT 
+              (SELECT COUNT(*) FROM students) as total_students,
+              COUNT(*) as tests_completed,
+              COALESCE(ROUND(AVG(percentage), 1), 0) as average_score,
+              COALESCE(MAX(percentage), 0) as highest_score
+            FROM quiz_attempts`
+    }),
+    activeClient.execute({
+      sql: `SELECT qa.*, s.full_name as student_name, s.avatar as student_avatar, s.email as student_email
+            FROM quiz_attempts qa
+            LEFT JOIN students s ON qa.student_id = s.student_id
+            ORDER BY qa.completed_at DESC
+            LIMIT 200`
+    })
+  ]);
+
+  const statsRow = statsRes.rows[0] || {};
+  return {
+    stats: {
+      totalStudents: Number(statsRow.total_students) || 0,
+      testsCompleted: Number(statsRow.tests_completed) || 0,
+      averageScore: Number(statsRow.average_score) || 0,
+      highestScore: Number(statsRow.highest_score) || 0
+    },
+    attempts: attemptsRes.rows
+  };
+}
+
+// --------------------------------------------------------------------------
 // SERVER-SIDE XP TRANSACTIONS & LEVELING
 // --------------------------------------------------------------------------
 export async function awardXP({ studentId, amount, source, activityId = null, idempotencyKey = null }) {
@@ -956,6 +1006,30 @@ export async function recordQuizSubmission({ studentId, topicId, submissionToken
 
   const passed = percentage >= 80 ? 1 : 0;
   const isPerfect = percentage >= 100;
+
+  // Handle Full Comprehensive Grammar Test
+  if (topicId === 'full_grammar_test') {
+    const isPassed = percentage >= 80;
+    const xpReward = isPassed ? 75 : 20;
+    const attemptId = 'ftatt_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    await activeClient.execute({
+      sql: `INSERT INTO quiz_attempts (attempt_id, student_id, quiz_id, topic_id, submission_token, score, total_questions, correct_answers, incorrect_answers, percentage, passed, xp_earned)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [attemptId, studentId, null, 'full_grammar_test', submissionToken, score, totalQuestions, correctAnswers, incorrectAnswers, percentage, isPassed ? 1 : 0, xpReward]
+    });
+
+    if (xpReward > 0) {
+      await awardXP({
+        studentId,
+        amount: xpReward,
+        source: isPassed ? 'full_grammar_test_passed' : 'full_grammar_test_completed',
+        activityId: 'full_grammar_test',
+        idempotencyKey: `xp_ft_${submissionToken}`
+      });
+    }
+
+    return { student: await getStudentById(studentId), passed: isPassed, percentage, xpEarned: xpReward, attemptId };
+  }
 
   let xpReward = 0;
   const prevProgressRes = await activeClient.execute({

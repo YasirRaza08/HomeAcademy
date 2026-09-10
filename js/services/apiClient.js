@@ -214,6 +214,10 @@ class ApiClient {
     });
   }
 
+  async adminGetTestResults() {
+    return this.request('/api/admin/test-results', { isAdmin: true });
+  }
+
   async adminGetQuestions(topicId = null) {
     const query = topicId ? `?topicId=${encodeURIComponent(topicId)}` : '';
     return this.request(`/api/admin/questions${query}`, { isAdmin: true });
@@ -372,6 +376,10 @@ class ApiClient {
       method: 'POST',
       body: testData
     });
+  }
+
+  async getStudentTestHistory() {
+    return this.request('/api/student/history');
   }
 
   async recordActivityCompletion(activityData) {

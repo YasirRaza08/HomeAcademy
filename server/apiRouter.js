@@ -594,14 +594,22 @@ export async function handleApiRequest(req, res) {
     return sendJson(res, 200, { success: true, result });
   }
 
-  // Submit Quiz (POST /api/quiz/submit or /api/curriculum/:topicId/quiz)
-  const isQuizSubmit = (pathname === '/api/quiz/submit' || pathname.match(/^\/api\/curriculum\/([^/]+)\/quiz$/)) && method === 'POST';
+  // Student Test History (GET /api/student/history or /api/student/test-results)
+  if ((pathname === '/api/student/history' || pathname === '/api/student/test-results') && method === 'GET') {
+    const auth = await requireStudentAuth(req, url);
+    if (!auth) return sendError(res, 401, 'Unauthorized');
+    const attempts = await db.getStudentTestHistory(auth.student.id);
+    return sendJson(res, 200, { success: true, attempts, count: attempts.length });
+  }
+
+  // Submit Quiz or Full Grammar Test (POST /api/quiz/submit, /api/full-test/submit, or /api/curriculum/:topicId/quiz)
+  const isQuizSubmit = (pathname === '/api/quiz/submit' || pathname === '/api/full-test/submit' || pathname.match(/^\/api\/curriculum\/([^/]+)\/quiz$/)) && method === 'POST';
   if (isQuizSubmit) {
     const auth = await requireStudentAuth(req, url);
     if (!auth) return sendError(res, 401, 'Unauthorized');
 
     const body = await parseJsonBody(req);
-    const topicId = body.topicId || pathname.split('/')[3] || 'adjectives';
+    const topicId = body.topicId || (pathname === '/api/full-test/submit' ? 'full_grammar_test' : (pathname.split('/')[3] || 'adjectives'));
     const { submissionToken, score, totalQuestions, total, correctAnswers, incorrectAnswers, percentage, percent } = body;
 
     if (!submissionToken) return sendError(res, 400, 'Missing submissionToken');
@@ -855,9 +863,17 @@ export async function handleApiRequest(req, res) {
   // Admin: Get all students roster (GET /api/admin/students or /api/admin/roster)
   if ((pathname === '/api/admin/students' || pathname === '/api/admin/roster') && method === 'GET') {
     const admin = await requireAdminAuth(req, url);
-    if (!admin) return sendError(res, 401, 'Unauthorized');
+    if (!admin || admin.status !== 'authorized') return sendError(res, 401, 'Unauthorized');
     const students = await db.getAllStudents();
     return sendJson(res, 200, { success: true, students, count: students.length });
+  }
+
+  // Admin: Get all test results & summary metrics (GET /api/admin/test-results or /api/admin/quizzes/attempts)
+  if ((pathname === '/api/admin/test-results' || pathname === '/api/admin/quizzes/attempts') && method === 'GET') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin || admin.status !== 'authorized') return sendError(res, 401, 'Unauthorized');
+    const results = await db.getAllTestResults();
+    return sendJson(res, 200, { success: true, ...results });
   }
 
   // Admin: Student Dossier Profile (GET /api/admin/students/:id)

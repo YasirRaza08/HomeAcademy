@@ -30,11 +30,25 @@ export async function renderAdmin(container, onNavigate) {
     return;
   }
 
-  // Fetch real students roster from database
+  // Fetch real students roster and test results from database
+  let testSummary = {
+    totalStudents: 0,
+    testsCompleted: 0,
+    averageScore: 0,
+    highestScore: 0
+  };
+  let testAttempts = [];
   try {
-    const rosterRes = await apiClient.adminGetRoster();
+    const [rosterRes, testResultsRes] = await Promise.all([
+      apiClient.adminGetRoster().catch(() => null),
+      apiClient.adminGetTestResults().catch(() => null)
+    ]);
     if (rosterRes && Array.isArray(rosterRes.students)) {
       stateManager.state.students = rosterRes.students.map(s => ({ ...s }));
+    }
+    if (testResultsRes && testResultsRes.stats) {
+      testSummary = testResultsRes.stats;
+      testAttempts = testResultsRes.attempts || [];
     }
   } catch (e) {}
 
@@ -261,7 +275,9 @@ export async function renderAdmin(container, onNavigate) {
       notifications,
       totalStudents: currentStudents.length,
       totalClassXP: currentClassXP,
-      activeTopicsCount
+      activeTopicsCount,
+      testSummary,
+      testAttempts
     });
   };
 
@@ -385,11 +401,11 @@ export async function renderAdmin(container, onNavigate) {
  * Render the chosen tab content
  */
 async function renderActiveTab(tab, contentMount, mainContainer, onNavigate, data) {
-  const { students, classInfo, curriculumTopics, roleplays, notifications, totalStudents, totalClassXP, activeTopicsCount } = data;
+  const { students, classInfo, curriculumTopics, roleplays, notifications, totalStudents, totalClassXP, activeTopicsCount, testSummary, testAttempts } = data;
 
   switch (tab) {
     case 'overview':
-      renderOverviewTab(contentMount, { totalStudents, totalClassXP, activeTopicsCount, students, notifications });
+      renderOverviewTab(contentMount, { totalStudents, totalClassXP, activeTopicsCount, students, notifications, testSummary });
       break;
     case 'students':
       renderStudentsTab(contentMount, mainContainer, students, classInfo);
@@ -401,7 +417,7 @@ async function renderActiveTab(tab, contentMount, mainContainer, onNavigate, dat
       renderQuestionsTab(contentMount, curriculumTopics);
       break;
     case 'quizzes':
-      renderQuizzesTab(contentMount, curriculumTopics, students);
+      renderQuizzesTab(contentMount, curriculumTopics, students, testSummary, testAttempts);
       break;
     case 'activities':
       renderActivitiesTab(contentMount, curriculumTopics, students);
@@ -432,35 +448,69 @@ async function renderActiveTab(tab, contentMount, mainContainer, onNavigate, dat
 // --------------------------------------------------------------------------
 // 1. OVERVIEW TAB
 // --------------------------------------------------------------------------
-function renderOverviewTab(mount, { totalStudents, totalClassXP, activeTopicsCount, students, notifications }) {
+function renderOverviewTab(mount, { totalStudents, totalClassXP, activeTopicsCount, students, notifications, testSummary }) {
+  const summary = testSummary || {};
   const recentNotifications = (notifications || []).slice(0, 5);
 
   mount.innerHTML = `
-    <div class="stats-grid" style="margin-bottom: 24px;">
+    <!-- 4 Primary Summary Cards -->
+    <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+      Classroom Performance Overview:
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px;">
       <div class="stat-pill-card">
-        <div class="stat-icon-bubble navy">${usersIcon(20)}</div>
+        <div class="stat-icon-bubble navy">${usersIcon(22)}</div>
         <div class="stat-content">
-          <div class="stat-label">ENROLLED STUDENTS</div>
-          <div class="stat-value">${totalStudents} Active</div>
-          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Real persistent database records</div>
+          <div class="stat-label">TOTAL STUDENTS</div>
+          <div class="stat-value">${summary.totalStudents !== undefined ? summary.totalStudents : totalStudents} Enrolled</div>
+          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Real persistent student accounts</div>
         </div>
       </div>
 
       <div class="stat-pill-card">
-        <div class="stat-icon-bubble gold">${sparkIcon(20)}</div>
+        <div class="stat-icon-bubble gold" style="font-size: 1.25rem;">📝</div>
         <div class="stat-content">
-          <div class="stat-label">TOTAL CLASS XP</div>
-          <div class="stat-value">${totalClassXP} XP</div>
-          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">From real practice & quizzes</div>
+          <div class="stat-label">TESTS COMPLETED</div>
+          <div class="stat-value">${summary.testsCompleted || 0} Attempts</div>
+          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">From quizzes & grammar tests</div>
         </div>
       </div>
 
       <div class="stat-pill-card">
-        <div class="stat-icon-bubble red">${bookIcon(20)}</div>
+        <div class="stat-icon-bubble navy" style="color: var(--ha-success); font-size: 1.25rem;">🎯</div>
         <div class="stat-content">
-          <div class="stat-label">ACTIVE TOPICS</div>
-          <div class="stat-value">${activeTopicsCount} Active</div>
-          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Taught by Sir Zubair</div>
+          <div class="stat-label">AVERAGE SCORE</div>
+          <div class="stat-value" style="color: var(--ha-success);">${summary.averageScore || 0}%</div>
+          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Overall class accuracy</div>
+        </div>
+      </div>
+
+      <div class="stat-pill-card">
+        <div class="stat-icon-bubble red" style="color: var(--ha-gold-dark); font-size: 1.25rem;">🏆</div>
+        <div class="stat-content">
+          <div class="stat-label">HIGHEST SCORE</div>
+          <div class="stat-value" style="color: var(--ha-gold-dark);">${summary.highestScore || 0}%</div>
+          <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Top test score attained</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary Telemetry Badges -->
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
+      <div style="background: #F8FAFC; border: 1.5px solid var(--ha-border); padding: 10px 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.2rem;">⚡</span>
+        <div>
+          <div style="font-size: 0.7rem; font-weight: 800; color: var(--ha-text-muted); text-transform: uppercase;">TOTAL CLASS XP</div>
+          <strong style="color: var(--ha-navy); font-size: 1.1rem;">${totalClassXP} XP</strong>
+        </div>
+      </div>
+
+      <div style="background: #F8FAFC; border: 1.5px solid var(--ha-border); padding: 10px 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.2rem;">📚</span>
+        <div>
+          <div style="font-size: 0.7rem; font-weight: 800; color: var(--ha-text-muted); text-transform: uppercase;">ACTIVE TOPICS</div>
+          <strong style="color: var(--ha-navy); font-size: 1.1rem;">${activeTopicsCount} Topics Active</strong>
         </div>
       </div>
     </div>
@@ -510,7 +560,8 @@ function renderStudentsTab(mount, mainContainer, students, classInfo) {
           </p>
         </div>
 
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="admin-student-search-input" placeholder="🔍 Search by student name or email..." style="padding: 7px 14px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem; min-width: 260px;" />
           <button class="btn btn-outline btn-sm" id="btn-export-csv" style="display: inline-flex; align-items: center; gap: 6px;">
             <span>📥</span> Export CSV
           </button>
@@ -593,6 +644,20 @@ function renderStudentsTab(mount, mainContainer, students, classInfo) {
       sound.playClick();
       const studentId = el.dataset.id;
       showStudentDossierModal(studentId, mainContainer);
+    });
+  });
+
+  // Search filter for students table
+  mount.querySelector('#admin-student-search-input')?.addEventListener('input', (e) => {
+    const term = (e.target.value || '').toLowerCase().trim();
+    mount.querySelectorAll('.student-row').forEach(row => {
+      const name = (row.querySelector('td:nth-child(1)')?.textContent || '').toLowerCase();
+      const email = (row.querySelector('td:nth-child(2)')?.textContent || '').toLowerCase();
+      if (!term || name.includes(term) || email.includes(term)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
     });
   });
 
@@ -974,12 +1039,145 @@ async function renderQuestionsTab(mount, topics) {
 // --------------------------------------------------------------------------
 // 5. QUIZZES TAB
 // --------------------------------------------------------------------------
-function renderQuizzesTab(mount, topics, students) {
+function renderQuizzesTab(mount, topics, students, testSummary, testAttempts) {
+  const summary = testSummary || {};
+  const attempts = testAttempts || [];
+
   mount.innerHTML = `
+    <div style="margin-bottom: 24px;">
+      <!-- 4 Summary Metric Cards as Requested -->
+      <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+        Curriculum Exam Performance Summary:
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div class="stat-pill-card">
+          <div class="stat-icon-bubble navy">${usersIcon(22)}</div>
+          <div class="stat-content">
+            <div class="stat-label">TOTAL STUDENTS</div>
+            <div class="stat-value">${summary.totalStudents !== undefined ? summary.totalStudents : students.length}</div>
+            <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Enrolled in class</div>
+          </div>
+        </div>
+
+        <div class="stat-pill-card">
+          <div class="stat-icon-bubble gold" style="font-size: 1.25rem;">📝</div>
+          <div class="stat-content">
+            <div class="stat-label">TESTS COMPLETED</div>
+            <div class="stat-value">${summary.testsCompleted || attempts.length}</div>
+            <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Total attempts logged</div>
+          </div>
+        </div>
+
+        <div class="stat-pill-card">
+          <div class="stat-icon-bubble navy" style="color: var(--ha-success); font-size: 1.25rem;">🎯</div>
+          <div class="stat-content">
+            <div class="stat-label">AVERAGE SCORE</div>
+            <div class="stat-value" style="color: var(--ha-success);">${summary.averageScore || 0}%</div>
+            <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Average score across tests</div>
+          </div>
+        </div>
+
+        <div class="stat-pill-card">
+          <div class="stat-icon-bubble red" style="color: var(--ha-gold-dark); font-size: 1.25rem;">🏆</div>
+          <div class="stat-content">
+            <div class="stat-label">HIGHEST SCORE</div>
+            <div class="stat-value" style="color: var(--ha-gold-dark);">${summary.highestScore || 0}%</div>
+            <div style="font-size: 0.75rem; color: var(--ha-text-muted);">Highest score achieved</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Student Test Results Dossier -->
+    <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy); margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.3rem; color: var(--ha-navy); margin: 0 0 4px;">Student Test Results Dossier</h2>
+          <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+            Comprehensive audit log of all individual student test attempts, scores, percentages, and timestamps.
+          </p>
+        </div>
+
+        <div>
+          <input type="text" id="filter-quiz-attempts-input" placeholder="🔍 Search student or topic..."
+            style="padding: 7px 14px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem; min-width: 250px;" />
+        </div>
+      </div>
+
+      ${attempts.length === 0 ? `
+        <div style="padding: 32px 20px; text-align: center; background: #f8fafc; border-radius: var(--radius-md); border: 1.5px dashed var(--ha-border);">
+          <div style="font-size: 2rem; margin-bottom: 6px;">📝</div>
+          <strong style="color: var(--ha-navy); display: block; margin-bottom: 4px;">No test attempts recorded yet</strong>
+          <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+            As students take quizzes and the Full Grammar Test, their results will appear here with full scores and timestamps.
+          </p>
+        </div>
+      ` : `
+        <div class="table-responsive-wrapper" style="overflow-x: auto; border: 1.5px solid var(--ha-border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+          <table class="admin-table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+            <thead>
+              <tr style="background: #F1F5F9; text-align: left;">
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase;">Student</th>
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase;">Assessment / Topic</th>
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; text-align: center;">Score</th>
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; text-align: center;">Percentage</th>
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; text-align: center;">Status</th>
+                <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; text-align: right;">Date & Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${attempts.map(a => {
+                const isFull = a.topic_id === 'full_grammar_test';
+                const topicLabel = isFull ? 'Full Grammar Test' : (a.topic_id ? a.topic_id.replace(/_/g, ' ') : 'Quiz');
+                const isPassed = a.passed || a.percentage >= 80;
+                const studentName = a.student_name || 'Enrolled Student';
+                const studentAvatar = a.student_avatar || '🦁';
+
+                return `
+                  <tr class="attempt-audit-row" style="border-bottom: 1px solid var(--ha-border); transition: background 0.15s;">
+                    <td style="padding: 12px 16px; font-weight: 700; color: var(--ha-navy);">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.2rem;">${studentAvatar}</span>
+                        <div>
+                          <div style="white-space: nowrap;">${studentName}</div>
+                          ${a.student_email ? `<div style="font-size: 0.75rem; color: var(--ha-text-muted); font-weight: normal;">${a.student_email}</div>` : ''}
+                        </div>
+                      </div>
+                    </td>
+                    <td style="padding: 12px 16px; font-weight: 600; color: var(--ha-navy); text-transform: capitalize;">
+                      ${isFull ? '🎓 ' : '📝 '}${topicLabel}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center; font-weight: 700; color: var(--ha-navy); font-variant-numeric: tabular-nums;">
+                      ${a.score} / ${a.total_questions}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center;">
+                      <span class="badge ${isPassed ? 'badge-success' : 'badge-navy'}" style="font-weight: 800;">
+                        ${a.percentage}%
+                      </span>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: center;">
+                      <span style="font-weight: 800; color: ${isPassed ? 'var(--ha-success)' : 'var(--ha-red)'}; font-size: 0.82rem;">
+                        ${isPassed ? '✓ Passed' : 'Needs Review'}
+                      </span>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right; color: var(--ha-text-muted); font-size: 0.82rem; white-space: nowrap;">
+                      ${a.completed_at ? new Date(a.completed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Recent'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </div>
+
+    <!-- Topic Benchmark Progress -->
     <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy);">
-      <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 6px;">Curriculum Quizzes Performance</h2>
-      <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 20px;">
-        Topic quiz mastery benchmarks across enrolled students.
+      <h3 style="font-size: 1.15rem; color: var(--ha-navy); margin: 0 0 6px;">Topic Mastery Benchmarks</h3>
+      <p style="font-size: 0.85rem; color: var(--ha-text-muted); margin: 0 0 18px;">
+        Curriculum topic pass rates across all active students.
       </p>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
@@ -989,7 +1187,7 @@ function renderQuizzesTab(mount, topics, students) {
           return `
             <div style="padding: 16px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); background: #fff;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <strong style="color: var(--ha-navy); font-size: 1rem;">${t.title}</strong>
+                <strong style="color: var(--ha-navy); font-size: 0.95rem;">${t.title}</strong>
                 <span class="badge badge-navy">${passCount} / ${students.length} Passed</span>
               </div>
               <div class="progress-bar-bg" style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
@@ -1005,6 +1203,20 @@ function renderQuizzesTab(mount, topics, students) {
       </div>
     </div>
   `;
+
+  // Search filter for quiz attempts table
+  mount.querySelector('#filter-quiz-attempts-input')?.addEventListener('input', (e) => {
+    const term = (e.target.value || '').toLowerCase().trim();
+    mount.querySelectorAll('.attempt-audit-row').forEach(row => {
+      const student = (row.querySelector('td:nth-child(1)')?.textContent || '').toLowerCase();
+      const topic = (row.querySelector('td:nth-child(2)')?.textContent || '').toLowerCase();
+      if (!term || student.includes(term) || topic.includes(term)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  });
 }
 
 // --------------------------------------------------------------------------

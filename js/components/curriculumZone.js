@@ -124,9 +124,9 @@ export function renderCurriculumZone(container, onNavigate, initialTopicId = nul
                     <div style="font-size: 0.8rem; font-weight: 800; color: ${t.color}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
                       Topic ${t.number}
                     </div>
-                    <h3 style="font-size: 1.3rem; color: var(--ha-navy); margin-bottom: 8px;">${t.title}</h3>
+                    <h3 style="font-size: 1.3rem; color: var(--ha-navy); margin-bottom: 8px; font-weight: 800;">${t.title}</h3>
                     <p style="font-size: 0.9rem; color: var(--ha-text-muted); margin-bottom: 16px; line-height: 1.5;">
-                      ${t.subtitle}
+                      ${t.subtitle || t.summary || 'Master this foundational grammar and speaking topic.'}
                     </p>
                   </div>
 
@@ -134,8 +134,8 @@ export function renderCurriculumZone(container, onNavigate, initialTopicId = nul
                     <span style="font-size: 0.82rem; font-weight: 700; color: var(--ha-navy);">
                       Reward: +50 XP
                     </span>
-                    <button class="btn btn-primary btn-sm btn-start-topic" data-id="${t.id}" style="background: ${t.color};">
-                      ${isPassed ? 'Review Topic →' : 'Start Learning →'}
+                    <button class="btn btn-primary btn-sm btn-start-topic" data-id="${t.id}" style="background: ${t.color}; font-weight: 700;">
+                      View Topic →
                     </button>
                   </div>
                 </div>

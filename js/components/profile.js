@@ -5,6 +5,7 @@ import { stateManager } from '../state.js';
 import { AVATARS } from '../data/initial-data.js';
 import { getLevelInfo } from '../utils/helpers.js';
 import { sound } from '../audio.js';
+import { apiClient } from '../services/apiClient.js';
 
 export function renderProfile(container, onNavigate) {
   const student = stateManager.getCurrentStudent();
@@ -151,6 +152,23 @@ export function renderProfile(container, onNavigate) {
         </div>
       </div>
 
+      <!-- My Test Attempts History (Strict Student Isolation) -->
+      <div class="ha-card" style="padding: 28px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 4px;">My Test Attempts History</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+              Your personal exam records from the Turso database.
+            </p>
+          </div>
+          <button class="btn btn-outline btn-xs" id="btn-profile-refresh-tests">↻ Refresh</button>
+        </div>
+
+        <div id="profile-test-results-mount">
+          <p style="padding: 16px; text-align: center; color: var(--ha-text-muted); margin: 0;">Loading test records...</p>
+        </div>
+      </div>
+
       <!-- Account Settings & Logout -->
       <div class="ha-card" style="padding: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; border: 1px solid var(--ha-border);">
         <div>
@@ -166,6 +184,64 @@ export function renderProfile(container, onNavigate) {
 
     </div>
   `;
+
+  // Asynchronously load student test attempts
+  const loadProfileTestHistory = () => {
+    const mount = container.querySelector('#profile-test-results-mount');
+    if (!mount) return;
+
+    apiClient.getStudentTestHistory().then(res => {
+      const attempts = (res && res.attempts) ? res.attempts : (student.fullTestHistory || []);
+      if (!attempts || attempts.length === 0) {
+        mount.innerHTML = `<p style="padding: 14px; text-align: center; color: var(--ha-text-muted); margin: 0; background: #f8fafc; border-radius: var(--radius-md);">No test records logged yet. Take the Full Grammar Test to record your first score!</p>`;
+        return;
+      }
+      mount.innerHTML = `
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+            <thead>
+              <tr style="background: #F1F5F9; text-align: left;">
+                <th style="padding: 10px 12px; color: var(--ha-navy); font-weight: 800;">Assessment</th>
+                <th style="padding: 10px 12px; text-align: center; color: var(--ha-navy); font-weight: 800;">Score</th>
+                <th style="padding: 10px 12px; text-align: center; color: var(--ha-navy); font-weight: 800;">Percent</th>
+                <th style="padding: 10px 12px; text-align: center; color: var(--ha-navy); font-weight: 800;">Status</th>
+                <th style="padding: 10px 12px; text-align: right; color: var(--ha-text-muted); font-weight: 700;">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${attempts.map(a => {
+                const isFull = a.topic_id === 'full_grammar_test' || (typeof a.id === 'string' && a.id.startsWith('ft_'));
+                const topicName = isFull ? 'Full Grammar Assessment' : `Topic: ${a.topic_id ? a.topic_id.replace(/_/g, ' ') : 'Quiz'}`;
+                const scoreDisplay = `${a.score || 0} / ${a.total_questions || a.total || 0}`;
+                const percent = a.percentage !== undefined ? a.percentage : (a.percent || 0);
+                const isPassed = a.passed || percent >= 80;
+                const dateStr = a.completed_at ? new Date(a.completed_at).toLocaleDateString() : (a.date ? new Date(a.date).toLocaleDateString() : 'Recent');
+
+                return `
+                  <tr style="border-bottom: 1px solid var(--ha-border);">
+                    <td style="padding: 10px 12px; font-weight: 700; color: var(--ha-navy); text-transform: capitalize;">${isFull ? '🎓 ' : '📝 '}${topicName}</td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 700;">${scoreDisplay}</td>
+                    <td style="padding: 10px 12px; text-align: center;"><span class="badge ${isPassed ? 'badge-success' : 'badge-navy'}">${percent}%</span></td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 700; color: ${isPassed ? 'var(--ha-success)' : 'var(--ha-red)'}; font-size: 0.82rem;">${isPassed ? 'Passed' : 'Needs Review'}</td>
+                    <td style="padding: 10px 12px; text-align: right; color: var(--ha-text-muted); font-size: 0.82rem;">${dateStr}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }).catch(err => {
+      console.warn('Error loading profile test history:', err);
+      mount.innerHTML = `<p style="padding: 14px; text-align: center; color: var(--ha-text-muted);">Could not fetch test history at this time.</p>`;
+    });
+  };
+
+  loadProfileTestHistory();
+  container.querySelector('#btn-profile-refresh-tests')?.addEventListener('click', () => {
+    sound.playClick();
+    loadProfileTestHistory();
+  });
 
   // Avatar switcher
   container.querySelectorAll('.profile-avatar-btn').forEach(btn => {

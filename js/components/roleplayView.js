@@ -142,9 +142,20 @@ export function renderRoleplaysHub(container, onNavigate, activeRoleplayId = nul
                   </div>
 
                   <!-- Scenario Explanation -->
-                  <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.5; margin-bottom: 14px;">
-                    ${rp.scenario}
+                  <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.5; margin-bottom: 12px;">
+                    ${rp.situation || rp.scenario}
                   </p>
+
+                  <!-- Characters -->
+                  ${rp.characters && rp.characters.length > 0 ? `
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;">
+                      ${rp.characters.map(c => `
+                        <span class="badge badge-navy" style="font-size: 0.72rem; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px;">
+                          <span>${c.avatar || '👤'}</span> <strong>${c.name}</strong> (${c.role})
+                        </span>
+                      `).join('')}
+                    </div>
+                  ` : ''}
 
                   <!-- Grammar Focus Pills -->
                   <div style="margin-bottom: 16px;">
@@ -268,9 +279,46 @@ export function renderRoleplayRunner(container, onNavigate, roleplayOrId) {
               </h1>
             </div>
             
-            <p style="font-size: 0.95rem; color: var(--ha-text-main); line-height: 1.5; margin-bottom: 12px; background: #F8FAFC; padding: 10px 14px; border-radius: var(--radius-sm); border-left: 3px solid var(--ha-navy);">
-              <strong>Scenario:</strong> ${roleplay.scenario}
-            </p>
+            <!-- Situation Box -->
+            <div style="font-size: 0.95rem; color: var(--ha-text-main); line-height: 1.55; margin-bottom: 14px; background: #F8FAFC; padding: 12px 16px; border-radius: var(--radius-md); border-left: 4px solid var(--ha-navy);">
+              <div style="font-size: 0.76rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 4px;">
+                📍 Situation:
+              </div>
+              <div>${roleplay.situation || roleplay.scenario}</div>
+            </div>
+
+            <!-- Characters Row -->
+            <div style="margin-bottom: 14px; background: #FFFFFF; border: 1px solid var(--ha-border); border-radius: var(--radius-md); padding: 10px 14px;">
+              <div style="font-size: 0.74rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 6px;">
+                👥 Characters:
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                ${(roleplay.characters && roleplay.characters.length > 0 ? roleplay.characters : [
+                  { name: roleplay.miniRoleplay?.roleA || 'Speaker A', role: 'Main Speaker', avatar: '🗣️' },
+                  { name: roleplay.miniRoleplay?.roleB || 'Speaker B', role: 'Responding Speaker', avatar: '👂' }
+                ]).map(c => `
+                  <span class="badge badge-navy" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 4px 10px;">
+                    <span>${c.avatar || '👤'}</span>
+                    <strong>${c.name}</strong>
+                    <span style="opacity: 0.8; font-size: 0.72rem;">(${c.role})</span>
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Practice Instructions -->
+            <div style="margin-bottom: 14px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-md); padding: 10px 14px;">
+              <div style="font-size: 0.74rem; font-weight: 800; color: #92400E; text-transform: uppercase; margin-bottom: 4px;">
+                💡 Practice Instructions:
+              </div>
+              <ul style="margin: 0; padding-left: 18px; font-size: 0.82rem; color: #78350F; line-height: 1.45;">
+                ${(roleplay.practiceInstructions || [
+                  'Tap the audio button to hear native pronunciation for each spoken expression.',
+                  'Repeat each sentence out loud to master clear pronunciation and intonation.',
+                  'Practice speaking both characters out loud or with a classmate.'
+                ]).map(inst => `<li>${inst}</li>`).join('')}
+              </ul>
+            </div>
 
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <strong style="font-size: 0.8rem; color: var(--ha-navy); text-transform: uppercase; display: flex; align-items: center; gap: 5px;">

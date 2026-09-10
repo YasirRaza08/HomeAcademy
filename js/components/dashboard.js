@@ -10,6 +10,7 @@ import {
   trophyIcon, userIcon, sparkIcon, refreshIcon, checkCircleIcon, pencilIcon, dashboardIcon, 
   gamepadIcon, infoIcon 
 } from './icons.js';
+import { apiClient } from '../services/apiClient.js';
 
 export function renderDashboard(container, onNavigate) {
   const student = stateManager.getCurrentStudent();
@@ -380,6 +381,32 @@ export function renderDashboard(container, onNavigate) {
         </div>
       </div>
 
+      <!-- My Previous Test Results (Strict Student Isolation) -->
+      <div style="margin-bottom: 42px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-navy">Personal History</span>
+              <h2 style="font-size: 1.5rem; color: var(--ha-navy); margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>📝</span> My Previous Test Results
+              </h2>
+            </div>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin-top: 4px;">
+              Your saved assessments, scores, percentages, and performance records from the database.
+            </p>
+          </div>
+          <button class="btn btn-outline btn-sm" id="btn-dash-refresh-tests" style="display: inline-flex; align-items: center; gap: 6px;">
+            ${refreshIcon(14)} Refresh Results
+          </button>
+        </div>
+
+        <div id="dash-student-test-results">
+          <div style="padding: 24px; text-align: center; color: var(--ha-text-muted); background: #F8FAFC; border-radius: var(--radius-lg); border: 1.5px solid var(--ha-border);">
+            Loading your test records...
+          </div>
+        </div>
+      </div>
+
       <!-- Roleplay Presentations Module -->
       <div style="margin-bottom: 42px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
@@ -551,6 +578,124 @@ export function renderDashboard(container, onNavigate) {
   container.querySelector('#qa-fulltest')?.addEventListener('click', () => onNavigate('full-test'));
   container.querySelector('#qa-leaderboard')?.addEventListener('click', () => onNavigate('leaderboard'));
   container.querySelector('#qa-profile')?.addEventListener('click', () => onNavigate('profile'));
+
+  // Load My Previous Test Results with Strict Student Isolation
+  const loadStudentTestHistory = () => {
+    const resultsContainer = container.querySelector('#dash-student-test-results');
+    if (!resultsContainer) return;
+
+    apiClient.getStudentTestHistory().then(res => {
+      const attempts = (res && res.attempts) ? res.attempts : (student.fullTestHistory || []);
+      if (!attempts || attempts.length === 0) {
+        resultsContainer.innerHTML = `
+          <div style="padding: 28px; text-align: center; background: #F8FAFC; border: 1.5px dashed var(--ha-border); border-radius: var(--radius-lg);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">📝</div>
+            <strong style="color: var(--ha-navy); font-size: 1.05rem; display: block; margin-bottom: 6px;">No Test History Yet</strong>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); max-width: 480px; margin: 0 auto 16px;">
+              You haven't completed any tests yet. Take the comprehensive Full Grammar Test or complete a topic quiz to save your test records here!
+            </p>
+            <button class="btn btn-primary btn-sm" id="btn-dash-empty-test-trigger">Take Full Grammar Test →</button>
+          </div>
+        `;
+        resultsContainer.querySelector('#btn-dash-empty-test-trigger')?.addEventListener('click', () => {
+          sound.playClick();
+          onNavigate('full-test');
+        });
+      } else {
+        resultsContainer.innerHTML = `
+          <div class="table-responsive-wrapper" style="overflow-x: auto; border: 1.5px solid var(--ha-border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <table class="admin-table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <thead>
+                <tr style="background: #F1F5F9; text-align: left;">
+                  <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.8rem; text-transform: uppercase;">Assessment</th>
+                  <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; text-align: center;">Score</th>
+                  <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; text-align: center;">Percentage</th>
+                  <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; text-align: center;">Status</th>
+                  <th style="padding: 12px 16px; color: var(--ha-navy); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; text-align: right;">Date Completed</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${attempts.map(a => {
+                  const isFull = a.topic_id === 'full_grammar_test' || (typeof a.id === 'string' && a.id.startsWith('ft_'));
+                  const topicName = isFull ? 'Full Grammar Assessment' : `Topic: ${a.topic_id ? a.topic_id.replace(/_/g, ' ') : 'Quiz'}`;
+                  const scoreDisplay = `${a.score || 0} / ${a.total_questions || a.total || 0}`;
+                  const percent = a.percentage !== undefined ? a.percentage : (a.percent || 0);
+                  const isPassed = a.passed || percent >= 80;
+                  const dateStr = a.completed_at ? new Date(a.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (a.date ? new Date(a.date).toLocaleDateString() : 'Recent');
+
+                  return `
+                    <tr style="border-bottom: 1px solid var(--ha-border); transition: background 0.15s;">
+                      <td style="padding: 14px 16px; font-weight: 700; color: var(--ha-navy);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <span>${isFull ? '🎓' : '📝'}</span>
+                          <span style="text-transform: capitalize;">${topicName}</span>
+                        </div>
+                      </td>
+                      <td style="padding: 14px 16px; text-align: center; font-weight: 700; color: var(--ha-navy); font-variant-numeric: tabular-nums;">
+                        ${scoreDisplay}
+                      </td>
+                      <td style="padding: 14px 16px; text-align: center;">
+                        <span class="badge ${isPassed ? 'badge-success' : 'badge-navy'}" style="font-weight: 800;">
+                          ${percent}%
+                        </span>
+                      </td>
+                      <td style="padding: 14px 16px; text-align: center;">
+                        <span style="font-weight: 800; color: ${isPassed ? 'var(--ha-success)' : 'var(--ha-red)'}; font-size: 0.85rem;">
+                          ${isPassed ? '✓ Passed' : 'Needs Practice'}
+                        </span>
+                      </td>
+                      <td style="padding: 14px 16px; text-align: right; color: var(--ha-text-muted); font-size: 0.85rem; white-space: nowrap;">
+                        ${dateStr}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }).catch(err => {
+      console.warn('Failed to load student test history:', err);
+      const localAttempts = student.fullTestHistory || [];
+      if (localAttempts.length > 0) {
+        resultsContainer.innerHTML = `
+          <div class="table-responsive-wrapper" style="overflow-x: auto; border: 1.5px solid var(--ha-border); border-radius: var(--radius-lg);">
+            <table class="admin-table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+              <thead>
+                <tr style="background: #F1F5F9; text-align: left;">
+                  <th style="padding: 10px 14px;">Assessment</th>
+                  <th style="padding: 10px 14px; text-align: center;">Score</th>
+                  <th style="padding: 10px 14px; text-align: center;">Percentage</th>
+                  <th style="padding: 10px 14px; text-align: center;">Status</th>
+                  <th style="padding: 10px 14px; text-align: right;">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${localAttempts.map(a => `
+                  <tr style="border-bottom: 1px solid var(--ha-border);">
+                    <td style="padding: 12px 14px; font-weight: 700; color: var(--ha-navy);">🎓 Full Grammar Assessment</td>
+                    <td style="padding: 12px 14px; text-align: center; font-weight: 700;">${a.score} / ${a.total}</td>
+                    <td style="padding: 12px 14px; text-align: center;"><span class="badge ${a.passed ? 'badge-success' : 'badge-navy'}">${a.percent}%</span></td>
+                    <td style="padding: 12px 14px; text-align: center; font-weight: 700; color: ${a.passed ? 'var(--ha-success)' : 'var(--ha-red)'};">${a.passed ? '✓ Passed' : 'Needs Practice'}</td>
+                    <td style="padding: 12px 14px; text-align: right; color: var(--ha-text-muted); font-size: 0.85rem;">${new Date(a.date).toLocaleDateString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        resultsContainer.innerHTML = `<p style="padding: 16px; text-align: center; color: var(--ha-text-muted);">No past test records found.</p>`;
+      }
+    });
+  };
+
+  loadStudentTestHistory();
+  container.querySelector('#btn-dash-refresh-tests')?.addEventListener('click', () => {
+    sound.playClick();
+    loadStudentTestHistory();
+  });
 
   // Today's Practice 6-Question Drill Modal Launcher
   container.querySelector('#btn-start-daily-drill')?.addEventListener('click', () => {

@@ -218,6 +218,55 @@ async function runVerification() {
   assert.strictEqual(studentForbiddenRes.status, 403, 'Student access to admin routes must return 403 Forbidden');
   console.log('✓ 403 Forbidden verified for student token attempting admin route.\n');
 
+  // Step 14b: Test Full Grammar Test Submission (POST /api/full-test/submit)
+  console.log('14b. Testing Full Grammar Test Submission (POST /api/full-test/submit)...');
+  const fullTestToken = `ft_sub_${Date.now()}`;
+  const fullTestRes = await invokeApi('POST', '/api/full-test/submit', {
+    submissionToken: fullTestToken,
+    score: 17,
+    totalQuestions: 20,
+    total: 20,
+    percentage: 85,
+    percent: 85,
+    topicBreakdown: { adjectives: { correct: 2, total: 2, percent: 100 } }
+  }, {
+    authorization: `Bearer ${studentToken}`
+  });
+  assert.strictEqual(fullTestRes.status, 200, 'Full test submit should return 200');
+  assert.strictEqual(fullTestRes.body.passed, true);
+  console.log(`✓ Full grammar test submitted successfully! Passed: ${fullTestRes.body.passed}, XP: ${fullTestRes.body.xpAwarded}\n`);
+
+  // Step 14c: Test Student Test History with Strict Isolation (GET /api/student/history)
+  console.log('14c. Testing Student History with Strict Isolation (GET /api/student/history)...');
+  const studentHistoryRes = await invokeApi('GET', '/api/student/history', null, {
+    authorization: `Bearer ${studentToken}`
+  });
+  assert.strictEqual(studentHistoryRes.status, 200);
+  assert.ok(Array.isArray(studentHistoryRes.body.attempts), 'Should return array of attempts');
+  assert.ok(studentHistoryRes.body.attempts.length >= 2, 'Should include both quiz and full test');
+  const hasFullTest = studentHistoryRes.body.attempts.some(a => a.topic_id === 'full_grammar_test' && a.score === 17);
+  assert.ok(hasFullTest, 'Student history must contain the full grammar test (17/20)');
+  // Strict isolation check: all attempts must belong to studentId
+  studentHistoryRes.body.attempts.forEach(a => {
+    assert.strictEqual(a.student_id, studentId, 'Attempt must strictly belong to current student');
+  });
+  console.log('✓ Student test history retrieved with 100% strict student isolation.\n');
+
+  // Step 14d: Test Admin Summary Cards & Dossier Telemetry (GET /api/admin/test-results)
+  console.log('14d. Testing Admin Test Results & Summary Metrics (GET /api/admin/test-results)...');
+  const adminTestResultsRes = await invokeApi('GET', '/api/admin/test-results', null, {
+    authorization: `Bearer ${adminToken}`
+  });
+  assert.strictEqual(adminTestResultsRes.status, 200);
+  const { stats, attempts } = adminTestResultsRes.body;
+  assert.ok(stats, 'Response must contain stats object with the 4 summary metrics');
+  assert.ok(stats.totalStudents >= 1, 'stats.totalStudents must be >= 1');
+  assert.ok(stats.testsCompleted >= 2, 'stats.testsCompleted must be >= 2');
+  assert.ok(stats.averageScore > 0, 'stats.averageScore must be > 0');
+  assert.ok(stats.highestScore >= 85, 'stats.highestScore must be >= 85');
+  assert.ok(Array.isArray(attempts), 'attempts must be an array');
+  console.log(`✓ Admin summary metrics verified: Total Students: ${stats.totalStudents}, Tests Completed: ${stats.testsCompleted}, Avg Score: ${stats.averageScore}%, Highest: ${stats.highestScore}%\n`);
+
   // Step 15: Test Teacher Admin Roster Access (Authorized 200 OK)
   console.log('15. Testing Teacher Admin Roster Access (GET /api/admin/students)...');
   const rosterRes = await invokeApi('GET', '/api/admin/students', null, {

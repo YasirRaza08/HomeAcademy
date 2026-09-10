@@ -1,11 +1,11 @@
 // Home Academy Multi-Format Grammar Activities Hub
-// Provides 6+ interactive formats for every active class topic taught by Sir Zubair:
-// 1. Sentence Scramble / Arrange the Words
-// 2. Pair Matching (Opposites, Ownership, Pronouns)
-// 3. True or False Grammar Master
-// 4. Sentence Builder (Construct sentences with chips)
-// 5. Fill in the Blank & Sentence Completion
-// 6. Picture & Context Quiz
+// Comprehensive interactive practice modes:
+// 1. Vocabulary Practice (flashcards with audio pronunciation & definitions)
+// 2. Fill in the Blanks (complete sentences with missing grammar words)
+// 3. Sentence Building (construct sentences with touch-friendly chips)
+// 4. Multiple Choice Questions (MCQs with instant explanation)
+// 5. Speaking Practice (listen & repeat aloud with speech practice)
+// + Sentence Scramble, Pair Matching, and True or False
 
 import { stateManager } from '../state.js';
 import { sound } from '../audio.js';
@@ -14,15 +14,36 @@ import { TOPIC_ACTIVITIES, TOPIC_QUESTION_BANKS, shuffleArray } from '../data/to
 import { renderConceptVisual } from './creativeVisuals.js';
 import { 
   puzzleIcon, refreshIcon, checkCircleIcon, pencilIcon, bookIcon, 
-  checkIcon, trophyIcon, gamepadIcon, graduationCapIcon, infoIcon 
+  checkIcon, trophyIcon, gamepadIcon, graduationCapIcon, infoIcon,
+  speakerIcon, micIcon, arrowLeftIcon
 } from './icons.js';
+
+// Browser speech synthesis helper for clear pronunciation
+function playPronunciation(text) {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.88;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+      return true;
+    } catch (e) {
+      console.warn('Speech error:', e);
+    }
+  }
+  sound.playClick();
+  return false;
+}
 
 export function renderActivitiesHub(container, onNavigate, initialTopicId = null, initialActivityType = null) {
   const student = stateManager.getCurrentStudent();
   const activeTopics = stateManager.getActiveCurriculum();
 
   let selectedTopicId = initialTopicId || (activeTopics.length > 0 ? activeTopics[0].id : 'adjectives');
-  let currentActivity = initialActivityType || null; // 'scramble' | 'matching' | 'true_false' | 'builder' | 'fill' | 'picture'
+  let currentActivity = initialActivityType || null; 
+  // 'vocab' | 'fill' | 'builder' | 'mcq' | 'speaking' | 'scramble' | 'matching' | 'true_false'
 
   function render() {
     if (!currentActivity) {
@@ -38,31 +59,31 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     const activeTopicObj = activeTopics.find(t => t.id === selectedTopicId) || activeTopics[0];
 
     container.innerHTML = `
-      <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 900px;">
+      <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 960px;">
         
         <!-- Header -->
         <div style="text-align: center; margin-bottom: 28px;">
           <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-            <span class="badge badge-navy">Interactive Practice</span>
-            <span class="badge badge-red">Sir Zubair's Class Activities</span>
+            <span class="badge badge-navy">Interactive Grammar Practice</span>
+            <span class="badge badge-red">Sir Zubair's Class</span>
           </div>
-          <h1 style="font-size: 2.2rem; color: var(--ha-navy); margin-bottom: 8px;">Grammar Activities Hub</h1>
-          <p style="font-size: 1.05rem; color: var(--ha-text-muted); max-width: 620px; margin: 0 auto 20px;">
-            Choose a class topic and practice through <strong>matching pairs, sentence scrambles, true/false, and sentence building</strong>.
+          <h1 style="font-size: 2.2rem; color: var(--ha-navy); margin-bottom: 8px; font-weight: 800;">Grammar Activities Hub</h1>
+          <p style="font-size: 1.05rem; color: var(--ha-text-muted); max-width: 650px; margin: 0 auto 20px;">
+            Select a class topic and practice through <strong>Vocabulary practice, Fill in the blanks, Sentence building, MCQs, and Speaking practice</strong>.
           </p>
         </div>
 
         <!-- Topic Selector Tabs -->
-        <div style="margin-bottom: 28px;">
-          <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 10px; text-align: center;">
-            Select Grammar Topic:
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 10px; text-align: center;">
+            Select Topic to Practice:
           </div>
-          <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
             ${activeTopics.map(t => {
               const isSelected = t.id === selectedTopicId;
               return `
                 <button class="topic-filter-pill ${isSelected ? 'active' : ''}" data-topic-id="${t.id}"
-                  style="padding: 9px 16px; border-radius: var(--radius-pill); font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid ${isSelected ? t.color : 'var(--ha-border)'}; background: ${isSelected ? t.color : '#FFFFFF'}; color: ${isSelected ? '#FFFFFF' : 'var(--ha-navy)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                  style="padding: 8px 16px; border-radius: var(--radius-pill); font-size: 0.88rem; font-weight: 700; cursor: pointer; border: 2px solid ${isSelected ? t.color : 'var(--ha-border)'}; background: ${isSelected ? t.color : '#FFFFFF'}; color: ${isSelected ? '#FFFFFF' : 'var(--ha-navy)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
                   <span>Topic ${t.number}: ${t.title}</span>
                 </button>
               `;
@@ -74,112 +95,116 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
         ${activeTopicObj ? `
           <div class="ha-card" style="border-left: 6px solid ${activeTopicObj.color}; padding: 18px 24px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
             <div style="display: flex; align-items: center; gap: 14px;">
-              <div style="background: var(--ha-navy-subtle); width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: ${activeTopicObj.color};">
-                ${bookIcon(26)}
+              <div style="background: var(--ha-navy-subtle); width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: ${activeTopicObj.color}; font-size: 1.3rem;">
+                ${bookIcon(24)}
               </div>
               <div>
-                <span style="font-size: 0.78rem; font-weight: 800; color: ${activeTopicObj.color}; text-transform: uppercase;">Active Topic Practice</span>
-                <h2 style="font-size: 1.35rem; color: var(--ha-navy); margin: 0;">${activeTopicObj.title}</h2>
-                <div style="font-size: 0.88rem; color: var(--ha-text-muted);">${activeTopicObj.subtitle}</div>
+                <span style="font-size: 0.78rem; font-weight: 800; color: ${activeTopicObj.color}; text-transform: uppercase;">Active Topic Drills</span>
+                <h2 style="font-size: 1.3rem; color: var(--ha-navy); margin: 0; font-weight: 800;">${activeTopicObj.title}</h2>
+                <div style="font-size: 0.88rem; color: var(--ha-text-muted);">${activeTopicObj.subtitle || activeTopicObj.summary || ''}</div>
               </div>
             </div>
             <button class="btn btn-outline btn-sm" id="btn-open-topic-lesson" style="display: inline-flex; align-items: center; gap: 6px;">
-              ${bookIcon(15)} Open Full Lesson
+              ${bookIcon(15)} Open Full Lesson →
             </button>
           </div>
         ` : ''}
 
-        <!-- 6 Interactive Activity Cards Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 36px;">
+        <!-- The 5 Primary Interactive Activities Grid as Requested -->
+        <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          Interactive Learning Activities:
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; margin-bottom: 30px;">
           
-          <!-- Activity 1: Sentence Scramble / Arrange the Words -->
-          <div class="ha-card activity-select-card" data-activity="scramble" style="cursor: pointer; border-top: 5px solid #2563eb; transition: transform 0.2s, box-shadow 0.2s;">
+          <!-- Activity 1: Vocabulary Practice -->
+          <div class="ha-card activity-select-card" data-activity="vocab" style="cursor: pointer; border-top: 5px solid #8B5CF6; transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <div style="color: #2563eb; background: #EFF6FF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${puzzleIcon(26)}
+              <div style="color: #8B5CF6; background: #F5F3FF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+                ${bookIcon(24)}
+              </div>
+              <span class="badge" style="background: #F5F3FF; color: #8B5CF6; font-weight: 800;">+25 XP</span>
+            </div>
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">1. Vocabulary Practice</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Interactive flashcards with audio pronunciation, Urdu translations, and example sentences.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #8B5CF6; border-color: #8B5CF6;">Practice Vocabulary →</button>
+          </div>
+
+          <!-- Activity 2: Fill in the Blanks -->
+          <div class="ha-card activity-select-card" data-activity="fill" style="cursor: pointer; border-top: 5px solid #0891b2; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <div style="color: #0891b2; background: #ECFEFF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+                ${pencilIcon(24)}
               </div>
               <span class="badge badge-navy">+25 XP</span>
             </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">Sentence Scramble</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Arrange jumbled class words into correct grammatical sentences.
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">2. Fill in the Blanks</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Complete the sentence by selecting the grammatically correct word from the options.
             </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #2563eb;">Play Scramble →</button>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #0891b2; border-color: #0891b2;">Fill in the Blanks →</button>
           </div>
 
-          <!-- Activity 2: Matching Pairs -->
-          <div class="ha-card activity-select-card" data-activity="matching" style="cursor: pointer; border-top: 5px solid #059669; transition: transform 0.2s, box-shadow 0.2s;">
+          <!-- Activity 3: Sentence Building -->
+          <div class="ha-card activity-select-card" data-activity="builder" style="cursor: pointer; border-top: 5px solid #2563eb; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <div style="color: #2563eb; background: #EFF6FF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+                ${puzzleIcon(24)}
+              </div>
+              <span class="badge badge-navy">+30 XP</span>
+            </div>
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">3. Sentence Building</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Assemble word chips in proper grammatical order to construct full English sentences.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #2563eb; border-color: #2563eb;">Build Sentences →</button>
+          </div>
+
+          <!-- Activity 4: Multiple Choice Questions (MCQs) -->
+          <div class="ha-card activity-select-card" data-activity="mcq" style="cursor: pointer; border-top: 5px solid #d97706; transition: all 0.2s;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <div style="color: #d97706; background: #FFFBEB; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
+                ${checkCircleIcon(24)}
+              </div>
+              <span class="badge badge-gold">+25 XP</span>
+            </div>
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">4. Multiple Choice Questions</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Rapid multiple-choice questions testing grammar rules with immediate answers & review.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #d97706; border-color: #d97706;">Solve MCQs →</button>
+          </div>
+
+          <!-- Activity 5: Speaking Practice -->
+          <div class="ha-card activity-select-card" data-activity="speaking" style="cursor: pointer; border-top: 5px solid #059669; transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
               <div style="color: #059669; background: #ECFDF5; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${refreshIcon(26)}
+                ${micIcon(24)}
               </div>
               <span class="badge badge-success">+30 XP</span>
             </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">Grammar Matching</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Tap and match opposites, ownerships, question targets, and pronouns.
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">5. Speaking Practice</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Listen to native model pronunciations and practice reading sentences aloud with TTS audio.
             </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #059669;">Play Matching →</button>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #059669; border-color: #059669;">Practice Speaking →</button>
           </div>
 
-          <!-- Activity 3: True or False -->
-          <div class="ha-card activity-select-card" data-activity="true_false" style="cursor: pointer; border-top: 5px solid #d97706; transition: transform 0.2s, box-shadow 0.2s;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <div style="color: #d97706; background: #FFFBEB; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${checkCircleIcon(26)}
-              </div>
-              <span class="badge badge-gold">+20 XP</span>
-            </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">True or False</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Test grammar rules and identify correct vs incorrect English forms.
-            </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #d97706;">Play True or False →</button>
-          </div>
-
-          <!-- Activity 4: Sentence Builder -->
-          <div class="ha-card activity-select-card" data-activity="builder" style="cursor: pointer; border-top: 5px solid #7c3aed; transition: transform 0.2s, box-shadow 0.2s;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <div style="color: #7c3aed; background: #F5F3FF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${pencilIcon(26)}
-              </div>
-              <span class="badge badge-navy">+25 XP</span>
-            </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">Sentence Builder</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Assemble word chips in proper grammatical sequence to build sentences.
-            </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #7c3aed;">Build Sentences →</button>
-          </div>
-
-          <!-- Activity 5: Fill in the Blank -->
-          <div class="ha-card activity-select-card" data-activity="fill" style="cursor: pointer; border-top: 5px solid #0891b2; transition: transform 0.2s, box-shadow 0.2s;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-              <div style="color: #0891b2; background: #ECFEFF; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${bookIcon(26)}
-              </div>
-              <span class="badge badge-navy">+20 XP</span>
-            </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">Complete the Sentence</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Choose the missing adjective, question word, or possessive form.
-            </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #0891b2;">Fill in the Blank →</button>
-          </div>
-
-          <!-- Activity 6: Choose Correct Sentence -->
-          <div class="ha-card activity-select-card" data-activity="picture" style="cursor: pointer; border-top: 5px solid #dc2626; transition: transform 0.2s, box-shadow 0.2s;">
+          <!-- Activity 6: Pair Matching (Bonus) -->
+          <div class="ha-card activity-select-card" data-activity="matching" style="cursor: pointer; border-top: 5px solid #dc2626; transition: all 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
               <div style="color: #dc2626; background: #FEF2F2; width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;">
-                ${checkIcon(26)}
+                ${refreshIcon(24)}
               </div>
-              <span class="badge badge-red">+20 XP</span>
+              <span class="badge badge-red">+25 XP</span>
             </div>
-            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px;">Choose Correct Sentence</h3>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 18px;">
-              Identify the 100% grammatically correct sentence from the options.
+            <h3 style="font-size: 1.2rem; color: var(--ha-navy); margin-bottom: 6px; font-weight: 800;">6. Pair Matching</h3>
+            <p style="font-size: 0.88rem; color: var(--ha-text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Tap and match grammar pairs: opposites, ownership, and pronouns.
             </p>
-            <button class="btn btn-primary btn-sm" style="width: 100%; background: #dc2626;">Choose Sentence →</button>
+            <button class="btn btn-primary btn-sm" style="width: 100%; background: #dc2626; border-color: #dc2626;">Match Pairs →</button>
           </div>
 
         </div>
@@ -189,14 +214,14 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <span class="badge badge-gold">Mastery Exam</span>
-              <span style="font-size: 0.8rem; color: #E2E8F0;">Combined 6 Topics</span>
+              <span style="font-size: 0.8rem; color: #E2E8F0;">All ${activeTopics.length} Topics Combined</span>
             </div>
-            <h3 style="font-size: 1.35rem; color: #FFFFFF; margin: 0 0 4px;">Ready to test all grammar topics together?</h3>
+            <h3 style="font-size: 1.35rem; color: #FFFFFF; margin: 0 0 4px; font-weight: 800;">Ready to test all grammar topics together?</h3>
             <p style="font-size: 0.88rem; color: #CBD5E1; margin: 0;">
-              Take the Full Grammar Test with fresh questions every attempt. Earn +75 XP!
+              Take the Full Grammar Test with fresh questions, automatic score calculation, and persistent database records!
             </p>
           </div>
-          <button class="btn btn-accent btn-lg" id="btn-hub-goto-fulltest" style="display: inline-flex; align-items: center; gap: 8px;">
+          <button class="btn btn-accent btn-lg" id="btn-hub-goto-fulltest" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 800;">
             ${graduationCapIcon(18)} Take Full Grammar Test
           </button>
         </div>
@@ -225,7 +250,7 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     container.querySelector('#btn-open-topic-lesson')?.addEventListener('click', () => {
       sound.playClick();
       if (onNavigate) {
-        window.dispatchEvent(new CustomEvent('ha:open-topic', { detail: selectedTopicId }));
+        window.dispatchEvent(new CustomEvent('ha:open-topic', { detail: { topicId: selectedTopicId } }));
       }
     });
 
@@ -241,6 +266,21 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     const activeTopicObj = activeTopics.find(t => t.id === selectedTopicId) || activeTopics[0];
 
     switch (currentActivity) {
+      case 'vocab':
+        runVocabularyPractice(activeTopicObj);
+        break;
+      case 'fill':
+        runFillInBlank(activeTopicObj);
+        break;
+      case 'builder':
+        runSentenceBuilder(topicData, activeTopicObj);
+        break;
+      case 'mcq':
+        runMCQPractice(activeTopicObj);
+        break;
+      case 'speaking':
+        runSpeakingPractice(activeTopicObj);
+        break;
       case 'scramble':
         runSentenceScramble(topicData, activeTopicObj);
         break;
@@ -250,276 +290,832 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
       case 'true_false':
         runTrueFalse(topicData, activeTopicObj);
         break;
-      case 'builder':
-        runSentenceBuilder(topicData, activeTopicObj);
-        break;
-      case 'fill':
-        runFillInBlank(activeTopicObj);
-        break;
-      case 'picture':
-        runChooseCorrectSentence(activeTopicObj);
-        break;
       default:
         currentActivity = null;
         render();
     }
   }
 
-  // Activity Runner 1: Sentence Scramble / Arrange the Words
-  function runSentenceScramble(topicData, topicObj) {
-    const scrambles = topicData.scrambles || [];
-    if (scrambles.length === 0) {
-      currentActivity = null;
-      render();
-      return;
-    }
+  // --------------------------------------------------------------------------
+  // Activity Runner 1: VOCABULARY PRACTICE (Flashcards with Audio & Definitions)
+  // --------------------------------------------------------------------------
+  function runVocabularyPractice(topicObj) {
+    const rawVocab = topicObj.vocab || [];
+    const vocabList = rawVocab.length > 0 ? rawVocab : [
+      { word: topicObj.title, meaning: topicObj.subtitle || "Key English concept", example: "We use this topic daily." }
+    ];
 
     let currentIndex = 0;
-    let earnedXP = 0;
+    let isFlipped = false;
 
-    function renderItem() {
-      if (currentIndex >= scrambles.length) {
-        // Complete!
-        sound.playLevelUp();
-        fireConfetti(3000);
-        stateManager.recordActivityCompletion(topicObj.id, 'scramble', 25);
-
-        renderCompletionView(
-          puzzleIcon(64),
-          'Sentence Scramble Master!',
-          `You successfully arranged all sentences for <strong>${topicObj.title}</strong>!`,
-          25
-        );
-        return;
-      }
-
-      const item = scrambles[currentIndex];
-      const targetTokens = [...item.words];
-      const cleanAnswer = item.answer.replace(/[.?]/g, '').trim();
-      let availableTokens = shuffleArray([...targetTokens]).map((word, idx) => ({ id: idx, text: word, placed: false }));
-      let assembledTokens = [];
+    function renderCard() {
+      const item = vocabList[currentIndex];
+      const progressPercent = Math.round(((currentIndex + 1) / vocabList.length) * 100);
 
       container.innerHTML = `
-        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 760px;">
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
           
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline btn-sm" id="btn-runner-back">← Back to Activities</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-              <span class="badge badge-navy">Scramble ${currentIndex + 1} of ${scrambles.length}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-vocab-back" style="display: inline-flex; align-items: center; gap: 6px;">
+              ${arrowLeftIcon(15)} Activities Hub
+            </button>
+            <span class="badge badge-navy">Card ${currentIndex + 1} of ${vocabList.length}</span>
+          </div>
+
+          <div class="progress-container" style="height: 6px; margin-bottom: 24px;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; background: #8B5CF6;"></div>
+          </div>
+
+          <!-- Flashcard Container -->
+          <div class="ha-card" style="padding: 36px 28px; text-align: center; border-radius: var(--radius-xl); border-top: 6px solid #8B5CF6; margin-bottom: 24px; min-height: 280px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--ha-shadow-md);">
+            <div>
+              <span class="badge" style="background: #F5F3FF; color: #8B5CF6; font-weight: 800; margin-bottom: 16px;">
+                VOCABULARY ITEM • ${topicObj.title}
+              </span>
+              
+              <div style="font-size: clamp(2rem, 5vw, 2.6rem); font-weight: 900; color: var(--ha-navy); margin-bottom: 12px;">
+                ${item.word}
+              </div>
+
+              <div style="margin-bottom: 18px;">
+                <button class="btn btn-secondary btn-sm" id="btn-vocab-listen" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #8B5CF6; border-color: #8B5CF6;">
+                  ${speakerIcon(16)} Listen Pronunciation
+                </button>
+              </div>
+
+              <!-- Meaning & Example Box -->
+              <div id="vocab-details-box" style="background: #F8FAFC; border: 1.5px solid var(--ha-border); border-radius: var(--radius-lg); padding: 18px 20px; text-align: left; margin-top: 14px;">
+                <div style="font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 4px;">
+                  Meaning / Urdu:
+                </div>
+                <div style="font-size: 1.05rem; color: var(--ha-text-main); font-weight: 700; margin-bottom: 12px;">
+                  ${item.meaning || item.urdu || 'Definition'}
+                </div>
+
+                <div style="font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 4px;">
+                  Example Sentence:
+                </div>
+                <div style="font-size: 0.95rem; color: var(--ha-text-muted); font-style: italic; display: flex; justify-content: space-between; align-items: center;">
+                  <span>“${item.example || 'Example sentence'}”</span>
+                  <button class="btn btn-outline btn-xs" id="btn-vocab-listen-example" title="Listen Example">
+                    ${speakerIcon(13)}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size: 0.8rem; color: var(--ha-text-muted); margin-top: 18px;">
+              Tap Next to continue or Review anytime
             </div>
           </div>
 
-          <div class="ha-card topic-master-card" style="border-top: 5px solid ${topicObj.color}; text-align: center; padding: 32px 24px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: ${topicObj.color}; text-transform: uppercase; margin-bottom: 6px;">
-              Arrange the Words in Order
-            </div>
-
-            ${renderConceptVisual(topicObj.id, { question: item.answer })}
-
-            <h2 style="font-size: 1.4rem; color: var(--ha-navy); margin-bottom: 8px;">
-              Tap words in correct English order:
-            </h2>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin-bottom: 24px;">
-              Click each word chip to place it in the sentence slot below.
-            </p>
-
-            <!-- Target Slot -->
-            <div id="scramble-target-zone" style="min-height: 64px; background: #F8FAFC; border: 2px dashed var(--ha-border); border-radius: var(--radius-lg); padding: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
-              <span id="target-placeholder" style="color: var(--ha-text-muted); font-size: 0.92rem; font-style: italic;">
-                Tap words below to build the sentence
-              </span>
-            </div>
-
-            <!-- Chips Bank -->
-            <div id="scramble-chips-bank" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;">
-              ${availableTokens.map(tok => `
-                <button class="word-chip-btn" data-id="${tok.id}" data-word="${tok.text}"
-                  style="padding: 10px 18px; border-radius: var(--radius-pill); font-size: 1rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); color: var(--ha-navy); cursor: pointer; transition: all 0.15s; box-shadow: var(--ha-shadow-sm);">
-                  ${tok.text}
-                </button>
-              `).join('')}
-            </div>
-
-            <!-- Feedback Message -->
-            <div id="scramble-feedback" style="display: none; padding: 12px; border-radius: var(--radius-md); margin-bottom: 20px; font-weight: 700;"></div>
-
-            <!-- Action Controls -->
-            <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-              <button class="btn btn-outline" id="btn-reset-scramble">Reset</button>
-              <button class="btn btn-primary" id="btn-check-scramble" style="background: ${topicObj.color};" disabled>Check Sentence</button>
-              <button class="btn btn-secondary" id="btn-next-scramble" style="display: none;">Next Sentence →</button>
-            </div>
+          <!-- Controls -->
+          <div style="display: flex; justify-content: space-between; gap: 12px;">
+            <button class="btn btn-outline btn-lg" id="btn-vocab-prev" ${currentIndex === 0 ? 'disabled' : ''}>
+              ← Previous
+            </button>
+            <button class="btn btn-primary btn-lg" id="btn-vocab-next" style="flex: 1; background: #8B5CF6; border-color: #8B5CF6;">
+              ${currentIndex < vocabList.length - 1 ? 'Next Word →' : 'Complete Activity ✓'}
+            </button>
           </div>
 
         </div>
       `;
 
-      container.querySelector('#btn-runner-back')?.addEventListener('click', () => {
+      container.querySelector('#btn-vocab-back')?.addEventListener('click', () => {
         sound.playClick();
         currentActivity = null;
         render();
       });
 
-      const targetZone = container.querySelector('#scramble-target-zone');
-      const placeholder = container.querySelector('#target-placeholder');
-      const bank = container.querySelector('#scramble-chips-bank');
-      const checkBtn = container.querySelector('#btn-check-scramble');
-      const resetBtn = container.querySelector('#btn-reset-scramble');
-      const nextBtn = container.querySelector('#btn-next-scramble');
-      const feedback = container.querySelector('#scramble-feedback');
+      container.querySelector('#btn-vocab-listen')?.addEventListener('click', () => {
+        sound.playClick();
+        playPronunciation(item.word);
+      });
 
-      function updateTargetUI() {
-        if (assembledTokens.length === 0) {
-          if (placeholder) placeholder.style.display = 'inline';
-          targetZone.querySelectorAll('.placed-chip-btn').forEach(el => el.remove());
-          checkBtn.disabled = true;
-          return;
-        }
+      container.querySelector('#btn-vocab-listen-example')?.addEventListener('click', () => {
+        sound.playClick();
+        if (item.example) playPronunciation(item.example);
+      });
 
-        if (placeholder) placeholder.style.display = 'none';
-        targetZone.innerHTML = '';
-        assembledTokens.forEach((tok, idx) => {
-          const btn = document.createElement('button');
-          btn.className = 'placed-chip-btn';
-          btn.textContent = tok.text;
-          btn.style.cssText = 'padding: 8px 16px; border-radius: var(--radius-pill); font-size: 1rem; font-weight: 700; background: var(--ha-navy); color: #FFF; border: none; cursor: pointer;';
-          btn.title = 'Click to remove';
-          btn.addEventListener('click', () => {
-            sound.playClick();
-            assembledTokens.splice(idx, 1);
-            const bankBtn = bank.querySelector(`[data-id="${tok.id}"]`);
-            if (bankBtn) bankBtn.style.visibility = 'visible';
-            updateTargetUI();
-          });
-          targetZone.appendChild(btn);
-        });
-
-        checkBtn.disabled = assembledTokens.length !== availableTokens.length;
-      }
-
-      bank.querySelectorAll('.word-chip-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+      container.querySelector('#btn-vocab-prev')?.addEventListener('click', () => {
+        if (currentIndex > 0) {
           sound.playClick();
-          const id = parseInt(btn.dataset.id);
-          const word = btn.dataset.word;
-          btn.style.visibility = 'hidden';
-          assembledTokens.push({ id, text: word });
-          updateTargetUI();
+          currentIndex--;
+          renderCard();
+        }
+      });
+
+      container.querySelector('#btn-vocab-next')?.addEventListener('click', () => {
+        sound.playClick();
+        if (currentIndex < vocabList.length - 1) {
+          currentIndex++;
+          renderCard();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'vocab', 25);
+          renderCompletionView(
+            bookIcon(64),
+            'Vocabulary Practice Complete!',
+            `You reviewed all ${vocabList.length} vocabulary words for <strong>${topicObj.title}</strong>!`,
+            25
+          );
+        }
+      });
+    }
+
+    renderCard();
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity Runner 2: FILL IN THE BLANKS
+  // --------------------------------------------------------------------------
+  function runFillInBlank(topicObj) {
+    const rawBank = (TOPIC_QUESTION_BANKS[topicObj.id] || []).filter(q => q.type === 'fill' || (q.question && q.question.includes('___')));
+    const questions = rawBank.length > 0 ? shuffleArray(rawBank).slice(0, 5) : (topicObj.practiceQuestions || []).slice(0, 5);
+
+    let currentIndex = 0;
+    let score = 0;
+
+    function renderQuestion() {
+      const q = questions[currentIndex];
+      const progressPercent = Math.round(((currentIndex + 1) / questions.length) * 100);
+
+      container.innerHTML = `
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-fill-back">← Activities Hub</button>
+            <span class="badge badge-navy">Question ${currentIndex + 1} of ${questions.length}</span>
+          </div>
+
+          <div class="progress-container" style="height: 6px; margin-bottom: 24px;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; background: #0891b2;"></div>
+          </div>
+
+          <div class="ha-card" style="padding: 32px 26px; border-radius: var(--radius-xl); border-top: 6px solid #0891b2; margin-bottom: 24px;">
+            <span class="badge" style="background: #ECFEFF; color: #0891b2; font-weight: 800; margin-bottom: 14px;">
+              FILL IN THE BLANK
+            </span>
+
+            <h2 style="font-size: 1.4rem; color: var(--ha-navy); margin-bottom: 24px; line-height: 1.5; font-weight: 800;">
+              ${q.question}
+            </h2>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;" id="fill-options-container">
+              ${(q.options || []).map((opt, idx) => `
+                <button class="btn btn-outline fill-opt-btn" data-idx="${idx}"
+                  style="text-align: left; padding: 14px 18px; font-size: 1rem; font-weight: 700; border-radius: var(--radius-md);">
+                  ${opt}
+                </button>
+              `).join('')}
+            </div>
+
+            <div id="fill-feedback" style="display: none; padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.95rem; font-weight: 700;"></div>
+
+            <div style="text-align: right;">
+              <button class="btn btn-primary btn-lg" id="btn-fill-next" style="display: none; background: #0891b2; border-color: #0891b2;">
+                Next Question →
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-fill-back')?.addEventListener('click', () => {
+        sound.playClick();
+        currentActivity = null;
+        render();
+      });
+
+      const optBtns = container.querySelectorAll('.fill-opt-btn');
+      const feedback = container.querySelector('#fill-feedback');
+      const nextBtn = container.querySelector('#btn-fill-next');
+
+      optBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx, 10);
+          const isCorrect = idx === q.correct;
+
+          optBtns.forEach(b => b.disabled = true);
+
+          if (isCorrect) {
+            sound.playCorrect();
+            score++;
+            btn.style.background = 'var(--ha-success-bg)';
+            btn.style.borderColor = 'var(--ha-success)';
+            btn.style.color = '#065F46';
+            feedback.style.background = 'var(--ha-success-bg)';
+            feedback.style.color = '#065F46';
+            feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
+          } else {
+            sound.playWrong();
+            btn.style.background = '#FEF2F2';
+            btn.style.borderColor = 'var(--ha-error)';
+            btn.style.color = 'var(--ha-error)';
+            feedback.style.background = '#FEF2F2';
+            feedback.style.color = 'var(--ha-error)';
+            feedback.innerHTML = `❌ Incorrect. The correct answer is "${q.options[q.correct]}". ${q.explanation || ''}`;
+          }
+
+          feedback.style.display = 'block';
+          nextBtn.style.display = 'inline-flex';
         });
       });
 
-      resetBtn?.addEventListener('click', () => {
+      nextBtn?.addEventListener('click', () => {
         sound.playClick();
-        assembledTokens = [];
-        bank.querySelectorAll('.word-chip-btn').forEach(btn => btn.style.visibility = 'visible');
-        feedback.style.display = 'none';
-        updateTargetUI();
+        currentIndex++;
+        if (currentIndex < questions.length) {
+          renderQuestion();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'fill', 25);
+          renderCompletionView(
+            pencilIcon(64),
+            'Fill in the Blanks Complete!',
+            `You scored ${score} out of ${questions.length} on <strong>${topicObj.title}</strong>!`,
+            25
+          );
+        }
+      });
+    }
+
+    renderQuestion();
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity Runner 3: SENTENCE BUILDING (Chips)
+  // --------------------------------------------------------------------------
+  function runSentenceBuilder(topicData, topicObj) {
+    const rawSentences = topicData.sentenceBuilder || [
+      { parts: ["Could", "you", "please", "help", "me?"], correct: "Could you please help me?" },
+      { parts: ["How", "much", "is", "this", "bag?"], correct: "How much is this bag?" }
+    ];
+    const sentences = shuffleArray(rawSentences).slice(0, 4);
+
+    let currentIndex = 0;
+    let currentAssembled = [];
+
+    function renderSentence() {
+      const item = sentences[currentIndex];
+      const availableChips = shuffleArray([...item.parts]);
+      currentAssembled = [];
+
+      container.innerHTML = `
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-builder-back">← Activities Hub</button>
+            <span class="badge badge-navy">Sentence ${currentIndex + 1} of ${sentences.length}</span>
+          </div>
+
+          <div class="ha-card" style="padding: 32px 26px; border-radius: var(--radius-xl); border-top: 6px solid #2563eb; margin-bottom: 24px;">
+            <span class="badge" style="background: #EFF6FF; color: #2563eb; font-weight: 800; margin-bottom: 12px;">
+              SENTENCE BUILDER
+            </span>
+            <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin-bottom: 18px;">
+              Tap the word chips in the correct grammatical order:
+            </h2>
+
+            <!-- Assembled Line -->
+            <div id="assembled-box" style="min-height: 60px; padding: 12px 16px; background: #F8FAFC; border: 2px dashed #93C5FD; border-radius: var(--radius-md); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 24px;">
+              <span style="font-size: 0.88rem; color: var(--ha-text-muted); font-style: italic;" id="assembled-placeholder">Tap words below to build sentence...</span>
+            </div>
+
+            <!-- Available Chips -->
+            <div style="font-size: 0.8rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 8px;">
+              Available Word Chips:
+            </div>
+            <div id="chips-pool" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;">
+              ${availableChips.map((word, idx) => `
+                <button class="chip-btn btn btn-outline btn-sm" data-word="${word}" data-id="${idx}"
+                  style="font-size: 1rem; font-weight: 700; padding: 8px 16px; border-radius: var(--radius-pill); cursor: pointer;">
+                  ${word}
+                </button>
+              `).join('')}
+            </div>
+
+            <div id="builder-feedback" style="display: none; padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px; font-weight: 700;"></div>
+
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+              <button class="btn btn-outline" id="btn-builder-clear">Reset Chips</button>
+              <button class="btn btn-primary" id="btn-builder-check" style="background: #2563eb; border-color: #2563eb;">Check Sentence ✓</button>
+              <button class="btn btn-secondary" id="btn-builder-next" style="display: none; background: var(--ha-navy);">Next Sentence →</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-builder-back')?.addEventListener('click', () => {
+        sound.playClick();
+        currentActivity = null;
+        render();
+      });
+
+      const assembledBox = container.querySelector('#assembled-box');
+      const placeholder = container.querySelector('#assembled-placeholder');
+      const chips = container.querySelectorAll('.chip-btn');
+      const feedback = container.querySelector('#builder-feedback');
+      const checkBtn = container.querySelector('#btn-builder-check');
+      const nextBtn = container.querySelector('#btn-builder-next');
+
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          sound.playClick();
+          const word = chip.dataset.word;
+          currentAssembled.push({ word, chipEl: chip });
+          chip.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'none';
+
+          updateAssembled();
+        });
+      });
+
+      function updateAssembled() {
+        assembledBox.innerHTML = '';
+        currentAssembled.forEach((item, i) => {
+          const pill = document.createElement('span');
+          pill.className = 'badge badge-navy';
+          pill.style.fontSize = '0.95rem';
+          pill.style.padding = '6px 12px';
+          pill.style.cursor = 'pointer';
+          pill.textContent = item.word + ' ✕';
+          pill.addEventListener('click', () => {
+            sound.playClick();
+            item.chipEl.style.display = 'inline-block';
+            currentAssembled.splice(i, 1);
+            if (currentAssembled.length === 0 && placeholder) {
+              assembledBox.appendChild(placeholder);
+              placeholder.style.display = 'inline';
+            } else {
+              updateAssembled();
+            }
+          });
+          assembledBox.appendChild(pill);
+        });
+      }
+
+      container.querySelector('#btn-builder-clear')?.addEventListener('click', () => {
+        sound.playClick();
+        renderSentence();
       });
 
       checkBtn?.addEventListener('click', () => {
-        const studentSentence = assembledTokens.map(t => t.text).join(' ');
-        const isCorrect = studentSentence.toLowerCase() === cleanAnswer.toLowerCase() ||
-          studentSentence.toLowerCase() + '.' === item.answer.toLowerCase() ||
-          studentSentence.toLowerCase() + '?' === item.answer.toLowerCase();
+        const sentenceBuilt = currentAssembled.map(a => a.word).join(' ');
+        const targetClean = item.correct || item.parts.join(' ');
 
-        if (isCorrect) {
+        feedback.style.display = 'block';
+        if (sentenceBuilt.trim().toLowerCase() === targetClean.trim().toLowerCase()) {
           sound.playCorrect();
-          feedback.style.display = 'block';
           feedback.style.background = 'var(--ha-success-bg)';
           feedback.style.color = '#065F46';
-          feedback.style.border = '1px solid var(--ha-success)';
-          feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(18)} Correct! <strong>"${item.answer}"</strong></span>`;
+          feedback.innerHTML = `🎉 Perfect! "${sentenceBuilt}" is grammatically correct.`;
           checkBtn.style.display = 'none';
-          resetBtn.style.display = 'none';
           nextBtn.style.display = 'inline-flex';
         } else {
           sound.playWrong();
-          feedback.style.display = 'block';
-          feedback.style.background = 'var(--ha-red-light)';
-          feedback.style.color = '#991B1B';
-          feedback.style.border = '1px solid var(--ha-red)';
-          feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(18)} Not quite in order! Try resetting and listening to the word flow.</span>`;
+          feedback.style.background = '#FEF2F2';
+          feedback.style.color = 'var(--ha-error)';
+          feedback.innerHTML = `❌ Not quite in the right order. Tap 'Reset Chips' and try again.`;
         }
       });
 
       nextBtn?.addEventListener('click', () => {
         sound.playClick();
         currentIndex++;
-        renderItem();
+        if (currentIndex < sentences.length) {
+          renderSentence();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'builder', 30);
+          renderCompletionView(
+            puzzleIcon(64),
+            'Sentence Building Complete!',
+            `You assembled all ${sentences.length} sentences for <strong>${topicObj.title}</strong>!`,
+            30
+          );
+        }
       });
     }
 
-    renderItem();
+    renderSentence();
   }
 
-  // Activity Runner 2: Matching Pairs
-  function runMatchingPairs(topicData, topicObj) {
-    const rawPairs = topicData.matching || [];
-    if (rawPairs.length === 0) {
-      currentActivity = null;
-      render();
+  // --------------------------------------------------------------------------
+  // Activity Runner 4: MULTIPLE CHOICE QUESTIONS (MCQs)
+  // --------------------------------------------------------------------------
+  function runMCQPractice(topicObj) {
+    const raw = (TOPIC_QUESTION_BANKS[topicObj.id] || []).filter(q => q.type === 'mcq' || Array.isArray(q.options));
+    const questions = raw.length > 0 ? shuffleArray(raw).slice(0, 5) : (topicObj.practiceQuestions || []).slice(0, 5);
+
+    let currentIndex = 0;
+    let score = 0;
+
+    function renderMCQ() {
+      const q = questions[currentIndex];
+      const progressPercent = Math.round(((currentIndex + 1) / questions.length) * 100);
+
+      container.innerHTML = `
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-mcq-back">← Activities Hub</button>
+            <span class="badge badge-gold">MCQ ${currentIndex + 1} of ${questions.length}</span>
+          </div>
+
+          <div class="progress-container" style="height: 6px; margin-bottom: 24px;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; background: #d97706;"></div>
+          </div>
+
+          <div class="ha-card" style="padding: 32px 26px; border-radius: var(--radius-xl); border-top: 6px solid #d97706; margin-bottom: 24px;">
+            <span class="badge" style="background: #FFFBEB; color: #d97706; font-weight: 800; margin-bottom: 12px;">
+              MULTIPLE CHOICE DRILL
+            </span>
+
+            <h2 style="font-size: 1.35rem; color: var(--ha-navy); margin-bottom: 22px; font-weight: 800; line-height: 1.45;">
+              ${q.question}
+            </h2>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+              ${(q.options || []).map((opt, i) => `
+                <button class="btn btn-outline mcq-opt-btn" data-idx="${i}"
+                  style="text-align: left; padding: 14px 18px; font-size: 1rem; font-weight: 700; border-radius: var(--radius-md);">
+                  <strong style="margin-right: 8px; color: var(--ha-navy);">${String.fromCharCode(65 + i)}.</strong> ${opt}
+                </button>
+              `).join('')}
+            </div>
+
+            <div id="mcq-feedback" style="display: none; padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.95rem; font-weight: 700;"></div>
+
+            <div style="text-align: right;">
+              <button class="btn btn-primary btn-lg" id="btn-mcq-next" style="display: none; background: #d97706; border-color: #d97706;">
+                Next Question →
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-mcq-back')?.addEventListener('click', () => {
+        sound.playClick();
+        currentActivity = null;
+        render();
+      });
+
+      const optBtns = container.querySelectorAll('.mcq-opt-btn');
+      const feedback = container.querySelector('#mcq-feedback');
+      const nextBtn = container.querySelector('#btn-mcq-next');
+
+      optBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx, 10);
+          const isCorrect = idx === q.correct;
+
+          optBtns.forEach(b => b.disabled = true);
+
+          if (isCorrect) {
+            sound.playCorrect();
+            score++;
+            btn.style.background = 'var(--ha-success-bg)';
+            btn.style.borderColor = 'var(--ha-success)';
+            btn.style.color = '#065F46';
+            feedback.style.background = 'var(--ha-success-bg)';
+            feedback.style.color = '#065F46';
+            feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
+          } else {
+            sound.playWrong();
+            btn.style.background = '#FEF2F2';
+            btn.style.borderColor = 'var(--ha-error)';
+            btn.style.color = 'var(--ha-error)';
+            feedback.style.background = '#FEF2F2';
+            feedback.style.color = 'var(--ha-error)';
+            feedback.innerHTML = `❌ Incorrect. The correct option is "${q.options[q.correct]}". ${q.explanation || ''}`;
+          }
+
+          feedback.style.display = 'block';
+          nextBtn.style.display = 'inline-flex';
+        });
+      });
+
+      nextBtn?.addEventListener('click', () => {
+        sound.playClick();
+        currentIndex++;
+        if (currentIndex < questions.length) {
+          renderMCQ();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'mcq', 25);
+          renderCompletionView(
+            checkCircleIcon(64),
+            'MCQ Practice Complete!',
+            `You scored ${score} out of ${questions.length} on <strong>${topicObj.title}</strong>!`,
+            25
+          );
+        }
+      });
+    }
+
+    renderMCQ();
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity Runner 5: SPEAKING PRACTICE (Listen & Read Aloud)
+  // --------------------------------------------------------------------------
+  function runSpeakingPractice(topicObj) {
+    const rawSentences = (topicObj.examples || []).map(e => e.english || e.text || e).filter(Boolean);
+    const sentences = rawSentences.length > 0 ? rawSentences.slice(0, 5) : [
+      "Could you please help me with this exercise?",
+      "How much is this book?",
+      "The living room is very clean and comfortable."
+    ];
+
+    let currentIndex = 0;
+
+    function renderSpeaking() {
+      const currentSentence = sentences[currentIndex];
+      const progressPercent = Math.round(((currentIndex + 1) / sentences.length) * 100);
+
+      container.innerHTML = `
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-speaking-back">← Activities Hub</button>
+            <span class="badge badge-teal">Sentence ${currentIndex + 1} of ${sentences.length}</span>
+          </div>
+
+          <div class="progress-container" style="height: 6px; margin-bottom: 24px;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; background: #059669;"></div>
+          </div>
+
+          <div class="ha-card" style="padding: 36px 28px; text-align: center; border-radius: var(--radius-xl); border-top: 6px solid #059669; margin-bottom: 24px;">
+            <span class="badge badge-success" style="margin-bottom: 16px;">
+              SPEAKING PRONUNCIATION DRILL
+            </span>
+
+            <div style="font-size: 0.88rem; color: var(--ha-text-muted); margin-bottom: 12px;">
+              Listen to the model pronunciation, then read aloud with clear voice:
+            </div>
+
+            <div style="font-size: clamp(1.4rem, 4vw, 1.85rem); font-weight: 800; color: var(--ha-navy); line-height: 1.45; margin-bottom: 24px; padding: 20px; background: #F8FAFC; border-radius: var(--radius-lg); border: 1.5px solid var(--ha-border);">
+              “${currentSentence}”
+            </div>
+
+            <!-- Audio Buttons -->
+            <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 24px;">
+              <button class="btn btn-primary btn-lg" id="btn-speak-listen" style="display: inline-flex; align-items: center; gap: 8px; background: #059669; border-color: #059669;">
+                ${speakerIcon(20)} Listen (Normal Speed)
+              </button>
+              <button class="btn btn-outline btn-lg" id="btn-speak-slow" style="display: inline-flex; align-items: center; gap: 8px;">
+                ${speakerIcon(18)} Listen (Slow)
+              </button>
+            </div>
+
+            <!-- Speaking Simulation / Repeat Aloud Prompt -->
+            <div style="padding: 16px; background: #ECFDF5; border-radius: var(--radius-md); border: 1px solid #A7F3D0; margin-bottom: 20px;">
+              <div style="font-weight: 800; color: #065F46; font-size: 0.95rem; margin-bottom: 4px;">
+                🎙️ Speaking Prompt:
+              </div>
+              <p style="font-size: 0.88rem; color: #047857; margin: 0;">
+                Say the sentence out loud now. Focus on clear pauses and natural English rhythm.
+              </p>
+            </div>
+
+            <button class="btn btn-secondary btn-lg" id="btn-speak-done" style="width: 100%; font-weight: 800; background: var(--ha-navy);">
+              I Said It Out Loud ✓ Next Sentence →
+            </button>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-speaking-back')?.addEventListener('click', () => {
+        sound.playClick();
+        currentActivity = null;
+        render();
+      });
+
+      container.querySelector('#btn-speak-listen')?.addEventListener('click', () => {
+        sound.playClick();
+        playPronunciation(currentSentence);
+      });
+
+      container.querySelector('#btn-speak-slow')?.addEventListener('click', () => {
+        sound.playClick();
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(currentSentence);
+          u.rate = 0.65;
+          window.speechSynthesis.speak(u);
+        }
+      });
+
+      container.querySelector('#btn-speak-done')?.addEventListener('click', () => {
+        sound.playCorrect();
+        currentIndex++;
+        if (currentIndex < sentences.length) {
+          renderSpeaking();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'speaking', 30);
+          renderCompletionView(
+            micIcon(64),
+            'Speaking Practice Complete!',
+            `You practiced speaking all ${sentences.length} sentences for <strong>${topicObj.title}</strong>!`,
+            30
+          );
+        }
+      });
+    }
+
+    renderSpeaking();
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity Runner 6: SENTENCE SCRAMBLE (Bonus)
+  // --------------------------------------------------------------------------
+  function runSentenceScramble(topicData, topicObj) {
+    const scrambles = topicData.scrambles || [];
+    if (scrambles.length === 0) {
+      runSentenceBuilder(topicData, topicObj);
       return;
     }
 
-    // Take up to 5 pairs for clean display
-    const selectedPairs = rawPairs.slice(0, 5);
-    const leftItems = selectedPairs.map((p, idx) => ({ id: idx, text: p.left, matched: false }));
-    const rightItems = shuffleArray(selectedPairs.map((p, idx) => ({ id: idx, text: p.right, matched: false })));
+    let currentIndex = 0;
+    const sessionItems = shuffleArray(scrambles).slice(0, 5);
+
+    function renderScrambleItem() {
+      const item = sessionItems[currentIndex];
+      const jumbled = shuffleArray([...item.words]);
+      let userOrder = [];
+
+      container.innerHTML = `
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-scramble-back">← Activities Hub</button>
+            <span class="badge badge-navy">Scramble ${currentIndex + 1} of ${sessionItems.length}</span>
+          </div>
+
+          <div class="ha-card" style="padding: 32px 26px; border-radius: var(--radius-xl); border-top: 6px solid #2563eb; margin-bottom: 24px;">
+            <h2 style="font-size: 1.3rem; color: var(--ha-navy); margin-bottom: 20px; font-weight: 800;">
+              Arrange words into a correct sentence:
+            </h2>
+
+            <div id="scramble-target" style="min-height: 56px; padding: 12px; background: #F8FAFC; border: 2px dashed #93C5FD; border-radius: var(--radius-md); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;"></div>
+
+            <div id="scramble-source" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;">
+              ${jumbled.map((w, i) => `
+                <button class="btn btn-outline btn-sm scramble-word-btn" data-word="${w}" data-idx="${i}" style="font-size: 1rem; font-weight: 700; border-radius: var(--radius-pill);">
+                  ${w}
+                </button>
+              `).join('')}
+            </div>
+
+            <div id="scramble-feedback" style="display: none; padding: 12px; border-radius: var(--radius-md); margin-bottom: 16px; font-weight: 700;"></div>
+
+            <div style="display: flex; justify-content: space-between;">
+              <button class="btn btn-outline" id="btn-scramble-reset">Reset</button>
+              <button class="btn btn-primary" id="btn-scramble-check" style="background: #2563eb; border-color: #2563eb;">Check ✓</button>
+              <button class="btn btn-secondary" id="btn-scramble-next" style="display: none; background: var(--ha-navy);">Next →</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('#btn-scramble-back')?.addEventListener('click', () => {
+        sound.playClick();
+        currentActivity = null;
+        render();
+      });
+
+      const target = container.querySelector('#scramble-target');
+      const sourceBtns = container.querySelectorAll('.scramble-word-btn');
+      const feedback = container.querySelector('#scramble-feedback');
+      const checkBtn = container.querySelector('#btn-scramble-check');
+      const nextBtn = container.querySelector('#btn-scramble-next');
+
+      sourceBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          sound.playClick();
+          const word = btn.dataset.word;
+          userOrder.push({ word, btn });
+          btn.style.display = 'none';
+
+          updateTarget();
+        });
+      });
+
+      function updateTarget() {
+        target.innerHTML = '';
+        userOrder.forEach((item, idx) => {
+          const pill = document.createElement('span');
+          pill.className = 'badge badge-navy';
+          pill.style.fontSize = '0.95rem';
+          pill.style.padding = '6px 12px';
+          pill.style.cursor = 'pointer';
+          pill.textContent = item.word + ' ✕';
+          pill.addEventListener('click', () => {
+            sound.playClick();
+            item.btn.style.display = 'inline-block';
+            userOrder.splice(idx, 1);
+            updateTarget();
+          });
+          target.appendChild(pill);
+        });
+      }
+
+      container.querySelector('#btn-scramble-reset')?.addEventListener('click', () => {
+        sound.playClick();
+        renderScrambleItem();
+      });
+
+      checkBtn?.addEventListener('click', () => {
+        const assembled = userOrder.map(u => u.word).join(' ');
+        const isCorrect = assembled.trim().toLowerCase() === item.correct.trim().toLowerCase();
+
+        feedback.style.display = 'block';
+        if (isCorrect) {
+          sound.playCorrect();
+          feedback.style.background = 'var(--ha-success-bg)';
+          feedback.style.color = '#065F46';
+          feedback.innerHTML = `🎉 Correct! "${assembled}"`;
+          checkBtn.style.display = 'none';
+          nextBtn.style.display = 'inline-flex';
+        } else {
+          sound.playWrong();
+          feedback.style.background = '#FEF2F2';
+          feedback.style.color = 'var(--ha-error)';
+          feedback.innerHTML = `❌ Keep trying! Words are not in the right order yet.`;
+        }
+      });
+
+      nextBtn?.addEventListener('click', () => {
+        sound.playClick();
+        currentIndex++;
+        if (currentIndex < sessionItems.length) {
+          renderScrambleItem();
+        } else {
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'scramble', 25);
+          renderCompletionView(
+            puzzleIcon(64),
+            'Sentence Scramble Complete!',
+            `You solved all ${sessionItems.length} scrambles for <strong>${topicObj.title}</strong>!`,
+            25
+          );
+        }
+      });
+    }
+
+    renderScrambleItem();
+  }
+
+  // --------------------------------------------------------------------------
+  // Activity Runner 7: PAIR MATCHING
+  // --------------------------------------------------------------------------
+  function runMatchingPairs(topicData, topicObj) {
+    const rawPairs = topicData.matching || [];
+    const selectedPairs = shuffleArray(rawPairs).slice(0, 4);
 
     let selectedLeftId = null;
     let selectedRightId = null;
     let matchedCount = 0;
 
+    const leftItems = shuffleArray(selectedPairs.map((p, i) => ({ id: i, text: p.left })));
+    const rightItems = shuffleArray(selectedPairs.map((p, i) => ({ id: i, text: p.right })));
+
     container.innerHTML = `
-      <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 820px;">
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-          <button class="btn btn-outline btn-sm" id="btn-matching-back">← Back to Activities</button>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-            <span class="badge badge-success" id="match-counter-badge">Matched: 0 / ${selectedPairs.length}</span>
-          </div>
+      <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <button class="btn btn-outline btn-sm" id="btn-matching-back">← Activities Hub</button>
+          <span class="badge badge-success" id="match-counter-badge">Matched: 0 / ${selectedPairs.length}</span>
         </div>
 
-        <div class="ha-card topic-master-card" style="border-top: 5px solid #059669; padding: 32px 24px;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: #059669; text-transform: uppercase; margin-bottom: 4px;">
-              Grammar Pair Matching
-            </div>
-            <h2 style="font-size: 1.45rem; color: var(--ha-navy); margin-bottom: 6px;">
-              Tap one item on the left, then tap its match on the right!
-            </h2>
-            <p style="font-size: 0.88rem; color: var(--ha-text-muted);">
-              Practice connecting grammar concepts, ownerships, and vocabulary.
-            </p>
-          </div>
+        <div class="ha-card" style="padding: 32px 24px; border-radius: var(--radius-xl); border-top: 6px solid #dc2626; margin-bottom: 24px;">
+          <h2 style="font-size: 1.3rem; color: var(--ha-navy); margin-bottom: 20px; font-weight: 800; text-align: center;">
+            Match Related Grammar Pairs
+          </h2>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-            <!-- Left Column -->
-            <div style="display: flex; flex-direction: column; gap: 12px;" id="left-column">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 10px;" id="left-column">
               ${leftItems.map(item => `
                 <button class="match-item-btn match-left" data-id="${item.id}"
-                  style="padding: 16px 18px; border-radius: var(--radius-md); font-size: 1.05rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); color: var(--ha-navy); text-align: center; cursor: pointer; transition: all 0.15s;">
+                  style="padding: 14px; border-radius: var(--radius-md); font-size: 1rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); cursor: pointer;">
                   ${item.text}
                 </button>
               `).join('')}
             </div>
-
-            <!-- Right Column -->
-            <div style="display: flex; flex-direction: column; gap: 12px;" id="right-column">
+            <div style="display: flex; flex-direction: column; gap: 10px;" id="right-column">
               ${rightItems.map(item => `
                 <button class="match-item-btn match-right" data-id="${item.id}"
-                  style="padding: 16px 18px; border-radius: var(--radius-md); font-size: 1.05rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); color: var(--ha-navy); text-align: center; cursor: pointer; transition: all 0.15s;">
+                  style="padding: 14px; border-radius: var(--radius-md); font-size: 1rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); cursor: pointer;">
                   ${item.text}
                 </button>
               `).join('')}
             </div>
           </div>
-
-          <div id="matching-feedback" style="display: none; text-align: center; padding: 14px; border-radius: var(--radius-md); font-weight: 700;"></div>
         </div>
-
       </div>
     `;
 
@@ -532,12 +1128,10 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     const leftBtns = container.querySelectorAll('.match-left');
     const rightBtns = container.querySelectorAll('.match-right');
     const counterBadge = container.querySelector('#match-counter-badge');
-    const feedback = container.querySelector('#matching-feedback');
 
     function checkPair() {
       if (selectedLeftId !== null && selectedRightId !== null) {
         if (selectedLeftId === selectedRightId) {
-          // Correct Match!
           sound.playCorrect();
           const lBtn = container.querySelector(`.match-left[data-id="${selectedLeftId}"]`);
           const rBtn = container.querySelector(`.match-right[data-id="${selectedRightId}"]`);
@@ -545,43 +1139,36 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
           if (lBtn && rBtn) {
             lBtn.style.background = 'var(--ha-success-bg)';
             lBtn.style.borderColor = 'var(--ha-success)';
-            lBtn.style.color = '#065F46';
             lBtn.disabled = true;
-
             rBtn.style.background = 'var(--ha-success-bg)';
             rBtn.style.borderColor = 'var(--ha-success)';
-            rBtn.style.color = '#065F46';
             rBtn.disabled = true;
           }
 
           matchedCount++;
           if (counterBadge) counterBadge.textContent = `Matched: ${matchedCount} / ${selectedPairs.length}`;
-
           selectedLeftId = null;
           selectedRightId = null;
 
           if (matchedCount >= selectedPairs.length) {
             sound.playLevelUp();
             fireConfetti(3000);
-            stateManager.recordActivityCompletion(topicObj.id, 'matching', 30);
+            stateManager.recordActivityCompletion(topicObj.id, 'matching', 25);
             setTimeout(() => {
               renderCompletionView(
                 refreshIcon(64),
-                'Pair Matching Complete!',
-                `You matched all grammar pairs for <strong>${topicObj.title}</strong>!`,
-                30
+                'Matching Complete!',
+                `You matched all pairs for <strong>${topicObj.title}</strong>!`,
+                25
               );
             }, 600);
           }
         } else {
-          // Wrong Match
           sound.playWrong();
           const lBtn = container.querySelector(`.match-left[data-id="${selectedLeftId}"]`);
           const rBtn = container.querySelector(`.match-right[data-id="${selectedRightId}"]`);
-
           if (lBtn) lBtn.style.borderColor = 'var(--ha-red)';
           if (rBtn) rBtn.style.borderColor = 'var(--ha-red)';
-
           setTimeout(() => {
             if (lBtn && !lBtn.disabled) lBtn.style.borderColor = 'var(--ha-border)';
             if (rBtn && !rBtn.disabled) rBtn.style.borderColor = 'var(--ha-border)';
@@ -595,12 +1182,9 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     leftBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         sound.playClick();
-        leftBtns.forEach(b => {
-          if (!b.disabled) b.style.borderColor = 'var(--ha-border)';
-        });
-        btn.style.borderColor = '#2563eb';
-        btn.style.background = '#EFF6FF';
-        selectedLeftId = parseInt(btn.dataset.id);
+        leftBtns.forEach(b => { if (!b.disabled) b.style.borderColor = 'var(--ha-border)'; });
+        btn.style.borderColor = 'var(--ha-navy)';
+        selectedLeftId = parseInt(btn.dataset.id, 10);
         checkPair();
       });
     });
@@ -608,94 +1192,55 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
     rightBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         sound.playClick();
-        rightBtns.forEach(b => {
-          if (!b.disabled) b.style.borderColor = 'var(--ha-border)';
-        });
-        btn.style.borderColor = '#2563eb';
-        btn.style.background = '#EFF6FF';
-        selectedRightId = parseInt(btn.dataset.id);
+        rightBtns.forEach(b => { if (!b.disabled) b.style.borderColor = 'var(--ha-border)'; });
+        btn.style.borderColor = 'var(--ha-navy)';
+        selectedRightId = parseInt(btn.dataset.id, 10);
         checkPair();
       });
     });
   }
 
-  // Activity Runner 3: True or False
+  // --------------------------------------------------------------------------
+  // Activity Runner 8: TRUE OR FALSE
+  // --------------------------------------------------------------------------
   function runTrueFalse(topicData, topicObj) {
-    const items = topicData.trueFalse || [];
-    if (items.length === 0) {
-      currentActivity = null;
-      render();
-      return;
-    }
+    const rawTF = topicData.trueFalse || [];
+    const questions = shuffleArray(rawTF).slice(0, 5);
 
     let currentIndex = 0;
-    let correctCount = 0;
+    let score = 0;
 
-    function renderItem() {
-      if (currentIndex >= items.length) {
-        sound.playLevelUp();
-        fireConfetti(3000);
-        stateManager.recordActivityCompletion(topicObj.id, 'true_false', 20);
-
-        renderCompletionView(
-          checkCircleIcon(64),
-          'True or False Master!',
-          `You answered ${correctCount} of ${items.length} questions correctly on <strong>${topicObj.title}</strong>!`,
-          20
-        );
-        return;
-      }
-
-      const item = items[currentIndex];
+    function renderTF() {
+      const q = questions[currentIndex];
 
       container.innerHTML = `
-        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 760px;">
-          
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline btn-sm" id="btn-tf-back">← Back to Activities</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-              <span class="badge badge-gold">Question ${currentIndex + 1} of ${items.length}</span>
-            </div>
+        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 720px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button class="btn btn-outline btn-sm" id="btn-tf-back">← Activities Hub</button>
+            <span class="badge badge-navy">Question ${currentIndex + 1} of ${questions.length}</span>
           </div>
 
-          <div class="ha-card topic-master-card" style="border-top: 5px solid #d97706; text-align: center; padding: 36px 28px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: #d97706; text-transform: uppercase; margin-bottom: 8px;">
-              Grammar Rule Challenge
-            </div>
-            
-            <div style="background: #F8FAFC; border: 2px solid var(--ha-border); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 28px;">
-              <p style="font-size: 1.35rem; color: var(--ha-navy); font-weight: 700; line-height: 1.45; margin: 0;">
-                “${item.statement}”
-              </p>
+          <div class="ha-card" style="padding: 36px 26px; text-align: center; border-radius: var(--radius-xl); border-top: 6px solid #d97706; margin-bottom: 24px;">
+            <span class="badge badge-gold" style="margin-bottom: 16px;">TRUE OR FALSE</span>
+            <div style="font-size: 1.45rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 24px; line-height: 1.45;">
+              “${q.statement || q.text}”
             </div>
 
-            <!-- Big True / False Buttons -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-              <button class="btn-tf-choice" data-choice="true"
-                style="padding: 20px; font-size: 1.25rem; font-weight: 800; border-radius: var(--radius-lg); border: 2px solid var(--ha-success); background: #FFFFFF; color: var(--ha-success); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span style="font-size: 1.6rem;">✓</span> TRUE
+            <div style="display: flex; justify-content: center; gap: 16px; margin-bottom: 20px;">
+              <button class="btn btn-outline btn-lg tf-btn" data-val="true" style="min-width: 140px; font-weight: 800; border-color: var(--ha-success); color: var(--ha-success);">
+                ✓ True
               </button>
-
-              <button class="btn-tf-choice" data-choice="false"
-                style="padding: 20px; font-size: 1.25rem; font-weight: 800; border-radius: var(--radius-lg); border: 2px solid var(--ha-red); background: #FFFFFF; color: var(--ha-red); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span style="font-size: 1.6rem;">✗</span> FALSE
+              <button class="btn btn-outline btn-lg tf-btn" data-val="false" style="min-width: 140px; font-weight: 800; border-color: var(--ha-error); color: var(--ha-error);">
+                ✗ False
               </button>
             </div>
 
-            <!-- Feedback & Explanation Box -->
-            <div id="tf-feedback-box" style="display: none; padding: 18px; border-radius: var(--radius-md); text-align: left; margin-bottom: 24px;">
-              <div id="tf-feedback-title" style="font-size: 1.1rem; font-weight: 800; margin-bottom: 6px;"></div>
-              <div id="tf-feedback-explanation" style="font-size: 0.92rem; line-height: 1.5;"></div>
-            </div>
+            <div id="tf-feedback" style="display: none; padding: 14px; border-radius: var(--radius-md); font-weight: 700; margin-bottom: 16px;"></div>
 
-            <div style="display: flex; justify-content: flex-end;">
-              <button class="btn btn-primary btn-lg" id="btn-next-tf" style="display: none; background: #d97706;">
-                Next Statement →
-              </button>
-            </div>
+            <button class="btn btn-primary btn-lg" id="btn-tf-next" style="display: none; background: var(--ha-navy);">
+              Next Question →
+            </button>
           </div>
-
         </div>
       `;
 
@@ -705,37 +1250,33 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
         render();
       });
 
-      const tfButtons = container.querySelectorAll('.btn-tf-choice');
-      const feedbackBox = container.querySelector('#tf-feedback-box');
-      const feedbackTitle = container.querySelector('#tf-feedback-title');
-      const feedbackExpl = container.querySelector('#tf-feedback-explanation');
-      const nextBtn = container.querySelector('#btn-next-tf');
+      const btns = container.querySelectorAll('.tf-btn');
+      const feedback = container.querySelector('#tf-feedback');
+      const nextBtn = container.querySelector('#btn-tf-next');
 
-      tfButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          tfButtons.forEach(b => b.disabled = true);
-          const chosenBool = btn.dataset.choice === 'true';
-          const isCorrect = chosenBool === item.isTrue;
+      btns.forEach(b => {
+        b.addEventListener('click', () => {
+          const userVal = b.dataset.val === 'true';
+          const isCorrect = userVal === q.isTrue;
+
+          btns.forEach(btn => btn.disabled = true);
 
           if (isCorrect) {
-            correctCount++;
             sound.playCorrect();
-            btn.style.background = 'var(--ha-success-bg)';
-            feedbackBox.style.background = 'var(--ha-success-bg)';
-            feedbackBox.style.color = '#065F46';
-            feedbackBox.style.border = '1.5px solid var(--ha-success)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(18)} That is correct!</span>`;
+            score++;
+            b.style.background = 'var(--ha-success-bg)';
+            feedback.style.background = 'var(--ha-success-bg)';
+            feedback.style.color = '#065F46';
+            feedback.innerHTML = `🎉 Correct! ${q.explanation || ''}`;
           } else {
             sound.playWrong();
-            btn.style.background = 'var(--ha-red-light)';
-            feedbackBox.style.background = 'var(--ha-red-light)';
-            feedbackBox.style.color = '#991B1B';
-            feedbackBox.style.border = '1.5px solid var(--ha-red)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(18)} Incorrect (It is actually ${item.isTrue ? 'TRUE' : 'FALSE'})</span>`;
+            b.style.background = '#FEF2F2';
+            feedback.style.background = '#FEF2F2';
+            feedback.style.color = 'var(--ha-error)';
+            feedback.innerHTML = `❌ Incorrect. The statement is ${q.isTrue ? 'True' : 'False'}. ${q.explanation || ''}`;
           }
 
-          feedbackExpl.textContent = item.explanation || '';
-          feedbackBox.style.display = 'block';
+          feedback.style.display = 'block';
           nextBtn.style.display = 'inline-flex';
         });
       });
@@ -743,489 +1284,68 @@ export function renderActivitiesHub(container, onNavigate, initialTopicId = null
       nextBtn?.addEventListener('click', () => {
         sound.playClick();
         currentIndex++;
-        renderItem();
-      });
-    }
-
-    renderItem();
-  }
-
-  // Activity Runner 4: Sentence Builder
-  function runSentenceBuilder(topicData, topicObj) {
-    const items = topicData.sentenceBuilder || [];
-    if (items.length === 0) {
-      currentActivity = null;
-      render();
-      return;
-    }
-
-    let currentIndex = 0;
-
-    function renderItem() {
-      if (currentIndex >= items.length) {
-        sound.playLevelUp();
-        fireConfetti(3000);
-        stateManager.recordActivityCompletion(topicObj.id, 'builder', 25);
-
-        renderCompletionView(
-          pencilIcon(64),
-          'Sentence Builder Champion!',
-          `You assembled all sentences successfully for <strong>${topicObj.title}</strong>!`,
-          25
-        );
-        return;
-      }
-
-      const item = items[currentIndex];
-      const targetTokens = [...item.chips];
-      let availableTokens = shuffleArray([...targetTokens]).map((tok, idx) => ({ id: idx, text: tok }));
-      let assembledTokens = [];
-
-      container.innerHTML = `
-        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 760px;">
-          
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline btn-sm" id="btn-builder-back">← Back to Activities</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-              <span class="badge badge-navy">Exercise ${currentIndex + 1} of ${items.length}</span>
-            </div>
-          </div>
-
-          <div class="ha-card topic-master-card" style="border-top: 5px solid #7c3aed; text-align: center; padding: 32px 24px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: #7c3aed; text-transform: uppercase; margin-bottom: 6px;">
-              Sentence Builder
-            </div>
-
-            ${renderConceptVisual(topicObj.id, { question: item.prompt })}
-
-            <h2 style="font-size: 1.35rem; color: var(--ha-navy); margin-bottom: 8px;">
-              ${item.prompt}
-            </h2>
-
-            <!-- Slot Zone -->
-            <div id="builder-slot-zone" style="min-height: 64px; background: #F8FAFC; border: 2px dashed var(--ha-border); border-radius: var(--radius-lg); padding: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
-              <span id="builder-placeholder" style="color: var(--ha-text-muted); font-size: 0.92rem; font-style: italic;">
-                Tap chips below in proper grammatical sequence
-              </span>
-            </div>
-
-            <!-- Chips -->
-            <div id="builder-chips-bank" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;">
-              ${availableTokens.map(tok => `
-                <button class="builder-chip-btn" data-id="${tok.id}" data-text="${tok.text}"
-                  style="padding: 10px 18px; border-radius: var(--radius-pill); font-size: 1rem; font-weight: 700; background: #FFFFFF; border: 2px solid var(--ha-border); color: var(--ha-navy); cursor: pointer; transition: all 0.15s; box-shadow: var(--ha-shadow-sm);">
-                  ${tok.text}
-                </button>
-              `).join('')}
-            </div>
-
-            <div id="builder-feedback" style="display: none; padding: 12px; border-radius: var(--radius-md); margin-bottom: 20px; font-weight: 700;"></div>
-
-            <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-              <button class="btn btn-outline" id="btn-builder-reset">Reset</button>
-              <button class="btn btn-primary" id="btn-builder-check" style="background: #7c3aed;" disabled>Check Sentence</button>
-              <button class="btn btn-secondary" id="btn-builder-next" style="display: none;">Next Exercise →</button>
-            </div>
-          </div>
-
-        </div>
-      `;
-
-      container.querySelector('#btn-builder-back')?.addEventListener('click', () => {
-        sound.playClick();
-        currentActivity = null;
-        render();
-      });
-
-      const slotZone = container.querySelector('#builder-slot-zone');
-      const placeholder = container.querySelector('#builder-placeholder');
-      const bank = container.querySelector('#builder-chips-bank');
-      const checkBtn = container.querySelector('#btn-builder-check');
-      const resetBtn = container.querySelector('#btn-builder-reset');
-      const nextBtn = container.querySelector('#btn-builder-next');
-      const feedback = container.querySelector('#builder-feedback');
-
-      function updateSlotUI() {
-        if (assembledTokens.length === 0) {
-          if (placeholder) placeholder.style.display = 'inline';
-          slotZone.querySelectorAll('.builder-placed-chip').forEach(el => el.remove());
-          checkBtn.disabled = true;
-          return;
-        }
-
-        if (placeholder) placeholder.style.display = 'none';
-        slotZone.innerHTML = '';
-        assembledTokens.forEach((tok, idx) => {
-          const btn = document.createElement('button');
-          btn.className = 'builder-placed-chip';
-          btn.textContent = tok.text;
-          btn.style.cssText = 'padding: 8px 16px; border-radius: var(--radius-pill); font-size: 1rem; font-weight: 700; background: #7c3aed; color: #FFF; border: none; cursor: pointer;';
-          btn.title = 'Click to remove';
-          btn.addEventListener('click', () => {
-            sound.playClick();
-            assembledTokens.splice(idx, 1);
-            const bankBtn = bank.querySelector(`[data-id="${tok.id}"]`);
-            if (bankBtn) bankBtn.style.visibility = 'visible';
-            updateSlotUI();
-          });
-          slotZone.appendChild(btn);
-        });
-
-        checkBtn.disabled = assembledTokens.length !== availableTokens.length;
-      }
-
-      bank.querySelectorAll('.builder-chip-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          sound.playClick();
-          const id = parseInt(btn.dataset.id);
-          const text = btn.dataset.text;
-          btn.style.visibility = 'hidden';
-          assembledTokens.push({ id, text });
-          updateSlotUI();
-        });
-      });
-
-      resetBtn?.addEventListener('click', () => {
-        sound.playClick();
-        assembledTokens = [];
-        bank.querySelectorAll('.builder-chip-btn').forEach(b => b.style.visibility = 'visible');
-        feedback.style.display = 'none';
-        updateSlotUI();
-      });
-
-      checkBtn?.addEventListener('click', () => {
-        const studentSentence = assembledTokens.map(t => t.text).join(' ');
-        const isCorrect = studentSentence.trim() === item.correct.trim();
-
-        if (isCorrect) {
-          sound.playCorrect();
-          feedback.style.display = 'block';
-          feedback.style.background = 'var(--ha-success-bg)';
-          feedback.style.color = '#065F46';
-          feedback.style.border = '1px solid var(--ha-success)';
-          feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(18)} Correct sentence constructed!</span>`;
-          checkBtn.style.display = 'none';
-          resetBtn.style.display = 'none';
-          nextBtn.style.display = 'inline-flex';
+        if (currentIndex < questions.length) {
+          renderTF();
         } else {
-          sound.playWrong();
-          feedback.style.display = 'block';
-          feedback.style.background = 'var(--ha-red-light)';
-          feedback.style.color = '#991B1B';
-          feedback.style.border = '1px solid var(--ha-red)';
-          feedback.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(18)} Words are not in standard English order. Try again!</span>`;
+          sound.playLevelUp();
+          fireConfetti(3000);
+          stateManager.recordActivityCompletion(topicObj.id, 'true_false', 20);
+          renderCompletionView(
+            checkCircleIcon(64),
+            'True or False Complete!',
+            `You scored ${score} out of ${questions.length} on <strong>${topicObj.title}</strong>!`,
+            20
+          );
         }
       });
-
-      nextBtn?.addEventListener('click', () => {
-        sound.playClick();
-        currentIndex++;
-        renderItem();
-      });
     }
 
-    renderItem();
+    renderTF();
   }
 
-  // Activity Runner 5: Fill in the Blank / Complete Sentence
-  function runFillInBlank(topicObj) {
-    const bank = TOPIC_QUESTION_BANKS[topicObj.id] || [];
-    const fillQuestions = bank.filter(q => q.type === 'fill' || q.question.includes('_____'));
-    const pool = fillQuestions.length > 0 ? fillQuestions : bank.slice(0, 4);
-
-    let currentIndex = 0;
-    let correctCount = 0;
-
-    function renderItem() {
-      if (currentIndex >= pool.length) {
-        sound.playLevelUp();
-        fireConfetti(3000);
-        stateManager.recordActivityCompletion(topicObj.id, 'fill', 20);
-
-        renderCompletionView(
-          bookIcon(64),
-          'Fill in the Blank Complete!',
-          `You completed all sentence exercises for <strong>${topicObj.title}</strong>!`,
-          20
-        );
-        return;
-      }
-
-      const q = pool[currentIndex];
-
-      container.innerHTML = `
-        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 760px;">
-          
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline btn-sm" id="btn-fill-back">← Back to Activities</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-              <span class="badge badge-navy">Sentence ${currentIndex + 1} of ${pool.length}</span>
-            </div>
-          </div>
-
-          <div class="ha-card topic-master-card" style="border-top: 5px solid #0891b2; padding: 32px 24px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: #0891b2; text-transform: uppercase; margin-bottom: 6px;">
-              Complete the Sentence
-            </div>
-
-            ${renderConceptVisual(topicObj.id, q)}
-
-            <h2 style="font-size: 1.4rem; color: var(--ha-navy); margin-bottom: 24px; line-height: 1.4;">
-              ${q.question}
-            </h2>
-
-            <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 24px;" id="fill-options-grid">
-              ${(q.options || []).map((opt, idx) => `
-                <button class="fill-opt-btn" data-index="${idx}" data-text="${opt}"
-                  style="padding: 14px 20px; font-size: 1rem; font-weight: 700; color: var(--ha-navy); background: #FFFFFF; border: 2px solid var(--ha-border); border-radius: var(--radius-md); text-align: left; cursor: pointer; transition: all 0.15s;">
-                  <span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: var(--radius-pill); background: var(--ha-navy-subtle); margin-right: 12px; font-size: 0.85rem;">${String.fromCharCode(65 + idx)}</span>
-                  ${opt}
-                </button>
-              `).join('')}
-            </div>
-
-            <div id="fill-feedback-box" style="display: none; padding: 14px; border-radius: var(--radius-md); margin-bottom: 20px;">
-              <div id="fill-feedback-title" style="font-weight: 800; margin-bottom: 4px;"></div>
-              <div id="fill-feedback-text" style="font-size: 0.9rem;"></div>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end;">
-              <button class="btn btn-primary" id="btn-next-fill" style="display: none; background: #0891b2;">
-                Next Sentence →
-              </button>
-            </div>
-          </div>
-
-        </div>
-      `;
-
-      container.querySelector('#btn-fill-back')?.addEventListener('click', () => {
-        sound.playClick();
-        currentActivity = null;
-        render();
-      });
-
-      const optButtons = container.querySelectorAll('.fill-opt-btn');
-      const feedbackBox = container.querySelector('#fill-feedback-box');
-      const feedbackTitle = container.querySelector('#fill-feedback-title');
-      const feedbackText = container.querySelector('#fill-feedback-text');
-      const nextBtn = container.querySelector('#btn-next-fill');
-
-      optButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          optButtons.forEach(b => b.disabled = true);
-          const chosenIdx = parseInt(btn.dataset.index);
-          const isCorrect = chosenIdx === q.answer;
-
-          if (isCorrect) {
-            correctCount++;
-            sound.playCorrect();
-            btn.style.borderColor = 'var(--ha-success)';
-            btn.style.background = 'var(--ha-success-bg)';
-            btn.style.color = 'var(--ha-success)';
-            feedbackBox.style.background = 'var(--ha-success-bg)';
-            feedbackBox.style.color = '#065F46';
-            feedbackBox.style.border = '1px solid var(--ha-success)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(18)} Correct!</span>`;
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = 'var(--ha-red)';
-            btn.style.background = 'var(--ha-red-light)';
-            btn.style.color = 'var(--ha-red)';
-            feedbackBox.style.background = 'var(--ha-red-light)';
-            feedbackBox.style.color = '#991B1B';
-            feedbackBox.style.border = '1px solid var(--ha-red)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(18)} Incorrect (Correct: "${q.options[q.answer]}")</span>`;
-          }
-
-          feedbackText.textContent = q.explanation || '';
-          feedbackBox.style.display = 'block';
-          nextBtn.style.display = 'inline-flex';
-        });
-      });
-
-      nextBtn?.addEventListener('click', () => {
-        sound.playClick();
-        currentIndex++;
-        renderItem();
-      });
-    }
-
-    renderItem();
-  }
-
-  // Activity Runner 6: Choose Correct Sentence
-  function runChooseCorrectSentence(topicObj) {
-    const bank = TOPIC_QUESTION_BANKS[topicObj.id] || [];
-    const chooseQuestions = bank.filter(q => q.type === 'choose_sentence');
-    const pool = chooseQuestions.length > 0 ? chooseQuestions : bank.slice(0, 4);
-
-    let currentIndex = 0;
-    let correctCount = 0;
-
-    function renderItem() {
-      if (currentIndex >= pool.length) {
-        sound.playLevelUp();
-        fireConfetti(3000);
-        stateManager.recordActivityCompletion(topicObj.id, 'picture', 20);
-
-        renderCompletionView(
-          checkIcon(64),
-          'Sentence Master!',
-          `You selected the correct sentences for <strong>${topicObj.title}</strong>!`,
-          20
-        );
-        return;
-      }
-
-      const q = pool[currentIndex];
-
-      container.innerHTML = `
-        <div class="container" style="padding-top: 24px; padding-bottom: 60px; max-width: 760px;">
-          
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline btn-sm" id="btn-choose-back">← Back to Activities</button>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <span class="badge" style="background: ${topicObj.color}; color: #FFF;">${topicObj.title}</span>
-              <span class="badge badge-red">Question ${currentIndex + 1} of ${pool.length}</span>
-            </div>
-          </div>
-
-          <div class="ha-card topic-master-card" style="border-top: 5px solid #dc2626; padding: 32px 24px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: #dc2626; text-transform: uppercase; margin-bottom: 6px;">
-              Choose the Correct Sentence
-            </div>
-
-            ${renderConceptVisual(topicObj.id, q)}
-
-            <h2 style="font-size: 1.4rem; color: var(--ha-navy); margin-bottom: 24px;">
-              ${q.question}
-            </h2>
-
-            <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 24px;">
-              ${(q.options || []).map((opt, idx) => `
-                <button class="choose-opt-btn" data-index="${idx}"
-                  style="padding: 14px 20px; font-size: 1rem; font-weight: 700; color: var(--ha-navy); background: #FFFFFF; border: 2px solid var(--ha-border); border-radius: var(--radius-md); text-align: left; cursor: pointer; transition: all 0.15s;">
-                  <span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: var(--radius-pill); background: var(--ha-navy-subtle); margin-right: 12px; font-size: 0.85rem;">${String.fromCharCode(65 + idx)}</span>
-                  ${opt}
-                </button>
-              `).join('')}
-            </div>
-
-            <div id="choose-feedback-box" style="display: none; padding: 14px; border-radius: var(--radius-md); margin-bottom: 20px;">
-              <div id="choose-feedback-title" style="font-weight: 800; margin-bottom: 4px;"></div>
-              <div id="choose-feedback-text" style="font-size: 0.9rem;"></div>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end;">
-              <button class="btn btn-primary" id="btn-next-choose" style="display: none; background: #dc2626;">
-                Next Question →
-              </button>
-            </div>
-          </div>
-
-        </div>
-      `;
-
-      container.querySelector('#btn-choose-back')?.addEventListener('click', () => {
-        sound.playClick();
-        currentActivity = null;
-        render();
-      });
-
-      const optButtons = container.querySelectorAll('.choose-opt-btn');
-      const feedbackBox = container.querySelector('#choose-feedback-box');
-      const feedbackTitle = container.querySelector('#choose-feedback-title');
-      const feedbackText = container.querySelector('#choose-feedback-text');
-      const nextBtn = container.querySelector('#btn-next-choose');
-
-      optButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          optButtons.forEach(b => b.disabled = true);
-          const chosenIdx = parseInt(btn.dataset.index);
-          const isCorrect = chosenIdx === q.answer;
-
-          if (isCorrect) {
-            correctCount++;
-            sound.playCorrect();
-            btn.style.borderColor = 'var(--ha-success)';
-            btn.style.background = 'var(--ha-success-bg)';
-            btn.style.color = 'var(--ha-success)';
-            feedbackBox.style.background = 'var(--ha-success-bg)';
-            feedbackBox.style.color = '#065F46';
-            feedbackBox.style.border = '1px solid var(--ha-success)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${checkCircleIcon(18)} Perfect choice!</span>`;
-          } else {
-            sound.playWrong();
-            btn.style.borderColor = 'var(--ha-red)';
-            btn.style.background = 'var(--ha-red-light)';
-            btn.style.color = 'var(--ha-red)';
-            feedbackBox.style.background = 'var(--ha-red-light)';
-            feedbackBox.style.color = '#991B1B';
-            feedbackBox.style.border = '1px solid var(--ha-red)';
-            feedbackTitle.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">${infoIcon(18)} Incorrect (Correct: "${q.options[q.answer]}")</span>`;
-          }
-
-          feedbackText.textContent = q.explanation || '';
-          feedbackBox.style.display = 'block';
-          nextBtn.style.display = 'inline-flex';
-        });
-      });
-
-      nextBtn?.addEventListener('click', () => {
-        sound.playClick();
-        currentIndex++;
-        renderItem();
-      });
-    }
-
-    renderItem();
-  }
-
-  // Common Completion View
-  function renderCompletionView(icon, title, message, xpEarned) {
+  // --- View 3: Completion View ---
+  function renderCompletionView(iconHtml, title, message, xpAwarded) {
     container.innerHTML = `
-      <div class="container" style="padding-top: 40px; padding-bottom: 60px; max-width: 620px; text-align: center;">
-        <div class="ha-card topic-master-card" style="padding: 40px 28px; border-top: 6px solid var(--ha-gold);">
-          <div style="display: flex; justify-content: center; margin-bottom: 16px; color: var(--ha-gold);">
-            ${icon}
+      <div class="container" style="padding-top: 40px; padding-bottom: 70px; max-width: 620px; text-align: center;">
+        <div class="ha-card" style="padding: 40px 24px; border-radius: var(--radius-xl); border-top: 6px solid var(--ha-navy); box-shadow: var(--ha-shadow-md);">
+          <div style="display: flex; justify-content: center; margin-bottom: 16px; color: var(--ha-navy);">
+            ${iconHtml}
           </div>
-          <h1 style="font-size: 2rem; color: var(--ha-navy); margin-bottom: 8px;">${title}</h1>
-          <p style="font-size: 1.05rem; color: var(--ha-text-muted); margin-bottom: 24px; line-height: 1.5;">
+          <h2 style="font-size: 1.8rem; color: var(--ha-navy); margin-bottom: 8px; font-weight: 800;">
+            ${title}
+          </h2>
+          <p style="font-size: 1rem; color: var(--ha-text-muted); line-height: 1.6; margin-bottom: 24px;">
             ${message}
           </p>
 
-          <div style="display: inline-flex; align-items: center; gap: 8px; background: var(--ha-navy-subtle); padding: 10px 22px; border-radius: var(--radius-pill); margin-bottom: 28px;">
-            <span style="font-size: 1.2rem; font-weight: 800; color: var(--ha-gold-dark);">+${xpEarned} XP Awarded</span>
+          <div style="display: inline-flex; align-items: center; gap: 8px; background: var(--ha-navy-subtle); padding: 12px 24px; border-radius: var(--radius-pill); font-size: 1.2rem; font-weight: 800; color: var(--ha-gold-dark); margin-bottom: 28px;">
+            ⚡ +${xpAwarded} XP Added to Profile
           </div>
 
-          <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
-            <button class="btn btn-outline" id="btn-comp-another-act" style="display: inline-flex; align-items: center; gap: 8px;">
-              ${gamepadIcon(16)} Other Activities
+          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+            <button class="btn btn-primary btn-lg" id="btn-completion-hub" style="font-weight: 800;">
+              More Activities →
             </button>
-            <button class="btn btn-primary" id="btn-comp-goto-test" style="background: var(--ha-navy); display: inline-flex; align-items: center; gap: 8px;">
-              ${graduationCapIcon(16)} Take Full Grammar Test
+            <button class="btn btn-outline btn-lg" id="btn-completion-dash" style="font-weight: 800;">
+              My Dashboard
             </button>
           </div>
         </div>
       </div>
     `;
 
-    container.querySelector('#btn-comp-another-act')?.addEventListener('click', () => {
+    container.querySelector('#btn-completion-hub')?.addEventListener('click', () => {
       sound.playClick();
       currentActivity = null;
       render();
-      window.scrollTo(0, 0);
     });
 
-    container.querySelector('#btn-comp-goto-test')?.addEventListener('click', () => {
+    container.querySelector('#btn-completion-dash')?.addEventListener('click', () => {
       sound.playClick();
-      if (onNavigate) onNavigate('full-test');
+      if (onNavigate) onNavigate('dashboard');
     });
   }
 
-  // Initial render
+  // Initial call
   render();
 }

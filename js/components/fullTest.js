@@ -6,6 +6,7 @@ import { stateManager } from '../state.js';
 import { sound } from '../audio.js';
 import { fireConfetti } from '../confetti.js';
 import { generateFullGrammarTest } from '../data/topic-activities.js';
+import { apiClient } from '../services/apiClient.js';
 
 export function renderFullTest(container, onNavigate) {
   const student = stateManager.getCurrentStudent();
@@ -42,9 +43,13 @@ export function renderFullTest(container, onNavigate) {
   let userAnswers = [];
   let submissionToken = null;
   let testResult = null;
+  let saveStatus = 'saving'; // 'saving' | 'saved' | 'error'
+  let saveErrorMessage = '';
 
   function initTest() {
     submissionToken = 'sub_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    saveStatus = 'saving';
+    saveErrorMessage = '';
     // Gather all seen questions across topics
     let allSeen = [];
     activeTopics.forEach(t => {
@@ -373,6 +378,32 @@ export function renderFullTest(container, onNavigate) {
 
     stateManager.recordFullTestResult(recordPayload);
 
+    // Explicitly persist to database via backend API and track status
+    saveStatus = 'saving';
+    saveErrorMessage = '';
+
+    const executeSave = () => {
+      saveStatus = 'saving';
+      updateSaveStatusUI();
+      apiClient.recordFullGrammarTest({
+        submissionToken,
+        score: correctCount,
+        total,
+        percent,
+        topicBreakdown: breakdown
+      }).then(() => {
+        saveStatus = 'saved';
+        updateSaveStatusUI();
+      }).catch(err => {
+        console.error('Failed to save grammar test:', err);
+        saveStatus = 'error';
+        saveErrorMessage = err?.message || 'Network error';
+        updateSaveStatusUI();
+      });
+    };
+
+    executeSave();
+
     testResult = {
       correctCount,
       total,
@@ -380,7 +411,8 @@ export function renderFullTest(container, onNavigate) {
       passed,
       xpEarned,
       breakdown,
-      answers: userAnswers
+      answers: userAnswers,
+      executeSave
     };
 
     if (passed) {
@@ -395,6 +427,43 @@ export function renderFullTest(container, onNavigate) {
     window.scrollTo(0, 0);
   }
 
+  function updateSaveStatusUI() {
+    const mount = container.querySelector('#ft-save-status-mount');
+    if (!mount) return;
+
+    if (saveStatus === 'saving') {
+      mount.innerHTML = `
+        <div style="background: var(--ha-navy-subtle); border: 1.5px solid var(--ha-border); color: var(--ha-navy); padding: 12px 20px; border-radius: var(--radius-md); margin-bottom: 22px; display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 0.95rem;">
+          <span style="display: inline-block; width: 14px; height: 14px; border: 2px solid var(--ha-navy); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+          <span>Saving your test result to database...</span>
+        </div>
+      `;
+    } else if (saveStatus === 'saved') {
+      mount.innerHTML = `
+        <div style="background: #ECFDF5; border: 1.5px solid #10B981; color: #065F46; padding: 12px 22px; border-radius: var(--radius-md); margin-bottom: 22px; display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(16,185,129,0.12);">
+          <span style="font-size: 1.25rem;">✓</span>
+          <span>Your test result has been saved successfully.</span>
+        </div>
+      `;
+    } else {
+      mount.innerHTML = `
+        <div style="background: #FEF2F2; border: 1.5px solid #EF4444; color: #991B1B; padding: 12px 20px; border-radius: var(--radius-md); margin-bottom: 22px; display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; font-weight: 700; font-size: 0.95rem; flex-wrap: wrap;">
+          <div style="display: inline-flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.25rem;">⚠️</span>
+            <span>Something went wrong. Please try again.</span>
+          </div>
+          <button class="btn btn-outline btn-xs" id="btn-retry-save-test" style="border-color: #EF4444; color: #991B1B; font-weight: 800; padding: 4px 10px;">
+            Retry Saving
+          </button>
+        </div>
+      `;
+      mount.querySelector('#btn-retry-save-test')?.addEventListener('click', () => {
+        sound.playClick();
+        if (testResult && testResult.executeSave) testResult.executeSave();
+      });
+    }
+  }
+
   // Screen 3: Results & Performance Summary
   function renderResults() {
     const res = testResult;
@@ -402,6 +471,17 @@ export function renderFullTest(container, onNavigate) {
       testState = 'intro';
       render();
       return;
+    }
+
+    let performanceMessage = '';
+    if (res.percent >= 90) {
+      performanceMessage = `Outstanding achievement, <strong>${student.name}</strong>! You demonstrated comprehensive mastery across all ${activeTopics.length} class topics taught by <strong>Sir Zubair</strong> with top honors!`;
+    } else if (res.percent >= 80) {
+      performanceMessage = `Well done, <strong>${student.name}</strong>! You passed the comprehensive exam! Keep up the great work!`;
+    } else if (res.percent >= 60) {
+      performanceMessage = `Good effort, <strong>${student.name}</strong>! You scored ${res.percent}%. 80% is needed to pass. Review your mistakes below to reach complete mastery.`;
+    } else {
+      performanceMessage = `Keep practicing, <strong>${student.name}</strong>! You scored ${res.percent}%. Review the explanations and topic breakdown below, then take a fresh test to improve!`;
     }
 
     container.innerHTML = `
@@ -417,14 +497,14 @@ export function renderFullTest(container, onNavigate) {
             ${res.passed ? 'Full Grammar Test Passed!' : 'Exam Completed — Review Mistakes'}
           </h1>
 
-          <p style="font-size: 1.05rem; color: var(--ha-text-muted); max-width: 580px; margin: 0 auto 24px; line-height: 1.6;">
-            ${res.passed 
-              ? `Outstanding achievement, <strong>${student.name}</strong>! You mastered the ${activeTopics.length} class topics taught by <strong>Sir Zubair</strong>.`
-              : `You scored ${res.percent}%. 80% is required to pass the exam. Review your topic breakdown and mistakes below, then take a fresh test!`
-            }
+          <p style="font-size: 1.05rem; color: var(--ha-text-muted); max-width: 580px; margin: 0 auto 20px; line-height: 1.6;">
+            ${performanceMessage}
           </p>
 
-          <!-- Big Metric Badges -->
+          <!-- Real-Time Save Confirmation Mount -->
+          <div id="ft-save-status-mount"></div>
+
+          <!-- Big Metric Badges: Explicit format e.g. 17/20 -->
           <div style="display: inline-flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; background: var(--ha-navy-subtle); padding: 16px 26px; border-radius: var(--radius-lg); margin-bottom: 26px;">
             <div>
               <div style="font-size: 0.78rem; font-weight: 800; color: var(--ha-text-muted); text-transform: uppercase;">EXAM SCORE</div>
@@ -517,6 +597,8 @@ export function renderFullTest(container, onNavigate) {
       sound.playClick();
       onNavigate('dashboard');
     });
+
+    updateSaveStatusUI();
   }
 
   // Initial render
