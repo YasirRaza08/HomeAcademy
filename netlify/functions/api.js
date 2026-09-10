@@ -8,7 +8,10 @@ import { initDatabase } from '../../data/db.js';
 let initPromise = null;
 function ensureDatabaseInitialized() {
   if (!initPromise) {
-    initPromise = initDatabase()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database init timeout')), 4000)
+    );
+    initPromise = Promise.race([initDatabase(), timeoutPromise])
       .then(() => {
         console.log('[Home Academy] Production database schema verified on cold start.');
       })
@@ -24,7 +27,7 @@ function ensureDatabaseInitialized() {
  * Universal Handler: Supports both Netlify V1 (AWS Lambda event) and Netlify V2 (Web Request)
  */
 export const handler = async (eventOrRequest, context) => {
-  // Ensure DB migration and schema initialization are fully completed before executing API requests
+  // Ensure DB migration and schema initialization are executed with timeout protection
   try {
     await ensureDatabaseInitialized();
   } catch (err) {
@@ -44,7 +47,10 @@ export default handler;
 export const handlerLegacy = handler;
 
 async function handleLambdaEvent(event = {}, context) {
-  const rawPath = event.path || '/api';
+  let rawPath = event.path || '/api';
+  if (rawPath.startsWith('/.netlify/functions/api')) {
+    rawPath = rawPath.replace('/.netlify/functions/api', '/api');
+  }
   const queryString = event.rawQuery ? `?${event.rawQuery}` : (
     event.queryStringParameters && Object.keys(event.queryStringParameters).length > 0
       ? '?' + new URLSearchParams(event.queryStringParameters).toString()
@@ -139,8 +145,13 @@ async function handleWebRequest(request, context) {
     headers[k.toLowerCase()] = v;
   }
 
+  let reqPath = url.pathname;
+  if (reqPath.startsWith('/.netlify/functions/api')) {
+    reqPath = reqPath.replace('/.netlify/functions/api', '/api');
+  }
+
   const mockReq = {
-    url: url.pathname + url.search,
+    url: reqPath + url.search,
     method,
     headers,
     body: bodyBuffer,

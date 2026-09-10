@@ -506,9 +506,18 @@ async function ensureTeacherAccountSynchronized(activeClient) {
 export async function syncCurriculumAndQuestions(activeClient) {
   const cli = activeClient || getClient();
   try {
+    // Fast check: if questions are already populated, skip redundant network roundtrips on cold start
+    const qCountRes = await cli.execute("SELECT COUNT(*) as count FROM questions").catch(() => null);
+    const count = Number(qCountRes?.rows?.[0]?.count || 0);
+    if (count >= 50) {
+      return;
+    }
+
+    const batchStatements = [];
+
     // 1. Sync all active curriculum topics & quizzes
     for (const topic of OFFICIAL_TOPICS) {
-      await cli.execute({
+      batchStatements.push({
         sql: `INSERT INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json)
               VALUES (?, ?, ?, ?, ?, ?, 1, ?)
               ON CONFLICT(topic_id) DO UPDATE SET
@@ -520,7 +529,7 @@ export async function syncCurriculumAndQuestions(activeClient) {
                 data_json = excluded.data_json`,
         args: [topic.id, topic.number, topic.title, topic.subtitle || '', topic.summary || '', topic.color || '#0A2558', JSON.stringify(topic)]
       });
-      await cli.execute({
+      batchStatements.push({
         sql: `INSERT OR IGNORE INTO quizzes (quiz_id, topic_id, title, total_questions, pass_percentage)
               VALUES (?, ?, ?, 5, 80)`,
         args: [`quiz_${topic.id}`, topic.id, `${topic.title} Mastery Quiz`]
@@ -530,11 +539,21 @@ export async function syncCurriculumAndQuestions(activeClient) {
     // 2. Sync all topic question banks
     for (const [topicId, qList] of Object.entries(TOPIC_QUESTION_BANKS)) {
       for (const q of qList) {
-        await cli.execute({
+        batchStatements.push({
           sql: `INSERT OR IGNORE INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'easy', 10, 1)`,
           args: [q.id, topicId, q.question, q.type || 'mcq', JSON.stringify(q.options || []), q.answer !== undefined ? q.answer : 0, q.explanation || '']
         });
+      }
+    }
+
+    if (batchStatements.length > 0) {
+      if (typeof cli.batch === 'function') {
+        await cli.batch(batchStatements, 'write');
+      } else {
+        for (const st of batchStatements) {
+          await cli.execute(st);
+        }
       }
     }
   } catch (err) {

@@ -213,7 +213,10 @@ async function requireAdminAuth(req, url) {
 export async function handleApiRequest(req, res) {
   const host = req.headers.host || 'localhost';
   const url = new URL(req.url, `http://${host}`);
-  const pathname = url.pathname;
+  let pathname = url.pathname;
+  if (pathname.startsWith('/.netlify/functions/api')) {
+    pathname = pathname.replace('/.netlify/functions/api', '/api');
+  }
   const method = req.method.toUpperCase();
 
   // CORS preflight
