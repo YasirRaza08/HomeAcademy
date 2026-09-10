@@ -113,7 +113,7 @@ async function runVerification() {
   });
   assert.strictEqual(meRes.status, 200);
   assert.strictEqual(meRes.body.student.name, 'Hamza Malik');
-  assert.strictEqual(meRes.body.topics.length, 6);
+  assert.strictEqual(meRes.body.topics.length, 8);
   assert.strictEqual(meRes.body.roleplays.length, 5);
   console.log('✓ Student profile and static curriculum verified.\n');
 

@@ -159,6 +159,7 @@ export async function initDatabase() {
 
     if (existingNames.has('users') && existingNames.has('messages') && existingNames.has('curriculum_topics')) {
       await ensureTeacherAccountSynchronized(activeClient);
+      await syncCurriculumAndQuestions(activeClient);
       return;
     }
   } catch (e) {}
@@ -502,6 +503,45 @@ async function ensureTeacherAccountSynchronized(activeClient) {
   }
 }
 
+export async function syncCurriculumAndQuestions(activeClient) {
+  const cli = activeClient || getClient();
+  try {
+    // 1. Sync all active curriculum topics & quizzes
+    for (const topic of OFFICIAL_TOPICS) {
+      await cli.execute({
+        sql: `INSERT INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json)
+              VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+              ON CONFLICT(topic_id) DO UPDATE SET
+                number = excluded.number,
+                title = excluded.title,
+                subtitle = excluded.subtitle,
+                summary = excluded.summary,
+                color = excluded.color,
+                data_json = excluded.data_json`,
+        args: [topic.id, topic.number, topic.title, topic.subtitle || '', topic.summary || '', topic.color || '#0A2558', JSON.stringify(topic)]
+      });
+      await cli.execute({
+        sql: `INSERT OR IGNORE INTO quizzes (quiz_id, topic_id, title, total_questions, pass_percentage)
+              VALUES (?, ?, ?, 5, 80)`,
+        args: [`quiz_${topic.id}`, topic.id, `${topic.title} Mastery Quiz`]
+      });
+    }
+
+    // 2. Sync all topic question banks
+    for (const [topicId, qList] of Object.entries(TOPIC_QUESTION_BANKS)) {
+      for (const q of qList) {
+        await cli.execute({
+          sql: `INSERT OR IGNORE INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'easy', 10, 1)`,
+          args: [q.id, topicId, q.question, q.type || 'mcq', JSON.stringify(q.options || []), q.answer !== undefined ? q.answer : 0, q.explanation || '']
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Home Academy] Curriculum/questions sync warning:', err.message);
+  }
+}
+
 // --------------------------------------------------------------------------
 // SYSTEM SEEDING (ZERO FAKE STUDENTS, REAL CONTENT ONLY)
 // --------------------------------------------------------------------------
@@ -542,27 +582,8 @@ async function seedInitialDataIfEmpty() {
     });
   }
 
-  // 3. Seed Curriculum Topics & Quizzes
-  for (const topic of OFFICIAL_TOPICS) {
-    await activeClient.execute({
-      sql: `INSERT OR IGNORE INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json) VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-      args: [topic.id, topic.number, topic.title, topic.subtitle || '', topic.summary || '', topic.color || '#0A2558', JSON.stringify(topic)]
-    });
-    await activeClient.execute({
-      sql: `INSERT OR IGNORE INTO quizzes (quiz_id, topic_id, title, total_questions, pass_percentage) VALUES (?, ?, ?, 5, 80)`,
-      args: [`quiz_${topic.id}`, topic.id, `${topic.title} Mastery Quiz`]
-    });
-  }
-
-  // 4. Seed Questions Database (90 real curriculum questions)
-  for (const [topicId, qList] of Object.entries(TOPIC_QUESTION_BANKS)) {
-    for (const q of qList) {
-      await activeClient.execute({
-        sql: `INSERT OR IGNORE INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active) VALUES (?, ?, ?, ?, ?, ?, ?, 'easy', 10, 1)`,
-        args: [q.id, topicId, q.question, q.type || 'mcq', JSON.stringify(q.options || []), q.answer !== undefined ? q.answer : 0, q.explanation || '']
-      });
-    }
-  }
+  // 3 & 4. Seed & Sync Curriculum Topics, Quizzes, and Questions
+  await syncCurriculumAndQuestions(activeClient);
 
   // 5. Seed Roleplays (5 official roleplay presentations)
   for (const rp of OFFICIAL_ROLEPLAYS) {

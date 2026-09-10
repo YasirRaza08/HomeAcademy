@@ -19,7 +19,11 @@ export const SCRAMBLE_WORDS = [
   { word: 'SMALL', hint: 'Opposite of big; little in size', category: 'Adjectives', icon: '🐭' },
   { word: 'COLD', hint: 'Opposite of hot; low temperature', category: 'Adjectives', icon: '❄️' },
   { word: 'WHERE', hint: 'Question word asking about place or location', category: 'Questions', icon: '📍' },
-  { word: 'THEIR', hint: 'Belonging to them (possessive adjective)', category: 'Possessives', icon: '👥' }
+  { word: 'THEIR', hint: 'Belonging to them (possessive adjective)', category: 'Possessives', icon: '👥' },
+  { word: 'COULD', hint: 'Polite modal verb for respectful requests', category: 'Could Requests', icon: '🤝' },
+  { word: 'POLITE', hint: 'Showing respectful and courteous behavior', category: 'Could Requests', icon: '🙏' },
+  { word: 'PRICE', hint: 'The cost of an item asked with How Much', category: 'How Much', icon: '🏷️' },
+  { word: 'PLURAL', hint: 'More than one item (uses How much are)', category: 'How Much', icon: '👟' }
 ];
 
 export const MATCH_PAIRS = [
@@ -89,6 +93,34 @@ export const SENTENCE_BUILDER_DATA = [
     scrambled: ['English', 'our', 'class.', 'We', 'love'],
     translation: 'Possessive "our" with class',
     hint: 'Starts with "We"'
+  },
+  {
+    id: 'sb9',
+    tokens: ['Could', 'you', 'please', 'open', 'the', 'door?'],
+    scrambled: ['door?', 'open', 'Could', 'the', 'you', 'please'],
+    translation: 'Polite request with Could you',
+    hint: 'Starts with "Could you please"'
+  },
+  {
+    id: 'sb10',
+    tokens: ['Could', 'you', 'pass', 'the', 'phone,', 'please?'],
+    scrambled: ['phone,', 'Could', 'the', 'pass', 'please?', 'you'],
+    translation: 'Polite request with please at the end',
+    hint: 'Starts with "Could you pass"'
+  },
+  {
+    id: 'sb11',
+    tokens: ['How', 'much', 'is', 'this', 'phone?'],
+    scrambled: ['phone?', 'is', 'How', 'this', 'much'],
+    translation: 'Singular price question (1 item)',
+    hint: 'Starts with "How much is"'
+  },
+  {
+    id: 'sb12',
+    tokens: ['How', 'much', 'are', 'these', 'shoes?'],
+    scrambled: ['shoes?', 'are', 'How', 'these', 'much'],
+    translation: 'Plural price question (2+ items)',
+    hint: 'Starts with "How much are"'
   }
 ];
 
@@ -132,6 +164,21 @@ export const TRUE_FALSE_DATA = [
     statement: 'To ask the color of Ali\'s car, we say: "What color is Ali\'s car?"',
     isTrue: true,
     explanation: 'Correct sentence combining What color + Genitive \'s!'
+  },
+  {
+    statement: 'After "Could you", we always use the base verb (e.g. open, help, pass).',
+    isTrue: true,
+    explanation: 'Correct! Always use the base verb form with could (never -ing or past).'
+  },
+  {
+    statement: '"How much are" is used when asking the price of a single phone.',
+    isTrue: false,
+    explanation: 'False! A single phone is singular, so we must say "How much is this phone?".'
+  },
+  {
+    statement: 'We use "How much is" for one item and "How much are" for multiple items.',
+    isTrue: true,
+    explanation: 'Correct! "is" for singular (1 item), "are" for plural (2+ items).'
   }
 ];
 
@@ -175,6 +222,38 @@ export const LISTENING_DRILLS = [
     options: ['Our', 'Their', 'His', 'Her'],
     correctAnswer: 'Our',
     transcript: "We love our English program at Home Academy."
+  },
+  {
+    id: 'l6',
+    sentence: "Could you please open the door for me? It is hot outside.",
+    question: "What did the person politely ask to open?",
+    options: ["The door", "The window", "The box", "The book"],
+    correctAnswer: "The door",
+    transcript: "Could you please open the door for me? It is hot outside."
+  },
+  {
+    id: 'l7',
+    sentence: "Could you pass the phone, please? My teacher is calling.",
+    question: "What object did the speaker ask to pass?",
+    options: ["The phone", "The pen", "The key", "The notebook"],
+    correctAnswer: "The phone",
+    transcript: "Could you pass the phone, please? My teacher is calling."
+  },
+  {
+    id: 'l8',
+    sentence: "Excuse me, how much is this black jacket? It is forty dollars.",
+    question: "How much is the black jacket?",
+    options: ["Forty dollars", "Fifty dollars", "Four dollars", "Free"],
+    correctAnswer: "Forty dollars",
+    transcript: "Excuse me, how much is this black jacket? It is forty dollars."
+  },
+  {
+    id: 'l9',
+    sentence: "How much are these new shoes? They are seventy dollars.",
+    question: "Why does the speaker say 'How much are'?",
+    options: ["Because shoes is plural", "Because shoes is singular", "Because it is past tense", "Because shoes is cheap"],
+    correctAnswer: "Because shoes is plural",
+    transcript: "How much are these new shoes? They are seventy dollars."
   }
 ];
 
@@ -227,5 +306,26 @@ export const SPEAKING_DRILLS = [
     target: "Our Home Academy English class is great",
     hint: "Say our official Academy title proudly.",
     difficulty: 'Medium'
+  },
+  {
+    id: 's8',
+    prompt: "Could you please open the door?",
+    target: "Could you please open the door",
+    hint: "Polite request with base verb 'open'.",
+    difficulty: 'Easy'
+  },
+  {
+    id: 's9',
+    prompt: "How much is this phone?",
+    target: "How much is this phone",
+    hint: "Singular price question with 'is'.",
+    difficulty: 'Easy'
+  },
+  {
+    id: 's10',
+    prompt: "How much are these shoes?",
+    target: "How much are these shoes",
+    hint: "Plural price question with 'are'.",
+    difficulty: 'Easy'
   }
 ];

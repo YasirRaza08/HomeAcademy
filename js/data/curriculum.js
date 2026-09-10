@@ -736,6 +736,314 @@ export const OFFICIAL_TOPICS = [
         explanation: "'What color is Sara's car?' follows the correct question order."
       }
     ]
+  },
+  {
+    id: "could_requests",
+    number: "07",
+    title: "Could — Polite Requests",
+    subtitle: "Asking politely with 'Could you...?'",
+    icon: "🤝",
+    color: "#7c3aed",
+    active: true,
+    summary: "We use 'Could you...?' when we want to politely ask someone to do something. Structure: Could you + base verb + ...? (e.g. 'Could you please open the door?'). Always use the base form of the verb (never past tense or -ing).",
+    explanationGuide: {
+      kyun: {
+        title: "Kyun Istemal Hota Hai? (Why do we use it?)",
+        urdu: "Kisi se koi kaam nihayat shistagi aur adab (polite request) ke sath karwane ke liye taake samne wale ko bura na lage.",
+        english: "To make polite and respectful requests when asking someone to do something for you."
+      },
+      kaise: {
+        title: "Kaise Istemal Hota Hai? (How is it formed?)",
+        urdu: "Jumle ke shuru mein 'Could you' lagate hain aur uske foran baad verb ki pehli (base) form aati hai. Sath mein 'please' bhi laga sakte hain.",
+        english: "Start with 'Could you' followed immediately by the base verb: [Could you + base verb + ... ?]. You can add 'please' for extra politeness.",
+        formula: "Could you + base verb + ... ?  (e.g. Could you please open the door?)"
+      },
+      kisLiye: {
+        title: "Kis Liye Istemal Hota Hai? (When & What for?)",
+        urdu: "Classroom, office, ghar ya bazaar mein kisi se madad maangne ya koi cheez pakarwane ke liye.",
+        english: "Use it whenever asking for help, asking someone to open a door or window, pass an object, or speak slowly.",
+        points: [
+          "🚪 Actions: Could you please open the door? / Could you close the window?",
+          "📱 Passing Objects: Could you pass the phone, please? / Could you give me a pen?",
+          "🤝 Asking for Help: Could you please help me with this?",
+          "💧 Everyday Favors: Could you bring me some water? / Could you turn on the light?",
+          "🗣️ Classroom Communication: Could you please repeat that? / Could you speak slowly?",
+          "⚠️ REMEMBER: Always use base verb! Say 'Could you open', NOT 'Could you opening' or 'Could you opened'."
+        ]
+      },
+      audioNarration: "Topic 7: Could — Polite Requests. Why do we use it? We use 'Could you' when we want to politely ask someone to do something. How is it formed? Use 'Could you' followed by the base verb: Could you please open the door? Remember: always use the base form of the verb, like 'open', 'help', or 'pass'. Never use past tense or ing."
+    },
+    vocab: [
+      { word: "open", category: "Action", example: "Could you please open the door?" },
+      { word: "close", category: "Action", example: "Could you close the window, please?" },
+      { word: "help", category: "Assistance", example: "Could you please help me with this?" },
+      { word: "pass", category: "Favor", example: "Could you pass the phone, please?" },
+      { word: "give", category: "Object", example: "Could you please give me a pen?" },
+      { word: "bring", category: "Object", example: "Could you please bring me some water?" },
+      { word: "repeat", category: "Speech", example: "Could you please repeat that?" },
+      { word: "speak slowly", category: "Speech", example: "Could you please speak slowly?" },
+      { word: "turn on", category: "Action", example: "Could you please turn on the light?" },
+      { word: "turn off", category: "Action", example: "Could you please turn off the fan?" },
+      { word: "wait", category: "Action", example: "Could you please wait here?" },
+      { word: "write it down", category: "Action", example: "Could you please write it down?" }
+    ],
+    examples: [
+      { english: "Could you please open the door?", note: "Polite request with 'please'" },
+      { english: "Could you pass the phone, please?", note: "Natural short form with 'please' at the end" },
+      { english: "Could you please close the window?", note: "Base verb 'close'" },
+      { english: "Could you please help me with this?", note: "Polite request for assistance" },
+      { english: "Could you please bring me some water?", note: "Polite request for an item" },
+      { english: "Could you please speak slowly?", note: "Polite request in English conversation" }
+    ],
+    practiceQuestions: [
+      {
+        type: "mcq",
+        question: "Choose the correct polite sentence:",
+        options: [
+          "Could you please open the door?",
+          "Could you opening the door?",
+          "Could you opened the door?",
+          "Could you opens the door?"
+        ],
+        answer: 0,
+        explanation: "Always use 'Could you' + base verb ('open')."
+      },
+      {
+        type: "fill",
+        question: "Could you please _____ the window?",
+        options: ["close", "closed", "closing", "closes"],
+        answer: "close",
+        explanation: "After 'Could you please', we use the base verb 'close'."
+      },
+      {
+        type: "choose_sentence",
+        question: "Complete the conversation: A: 'I can't hear the teacher.' B: '______'",
+        options: [
+          "Could you please speak slowly?",
+          "Could you speaking slowly?",
+          "Could you spoke slowly?",
+          "Could you speaks slowly?"
+        ],
+        answer: 0,
+        explanation: "'Could you please speak slowly?' is the polite request using base verb 'speak'."
+      },
+      {
+        type: "true_false",
+        question: "True or False: We can say 'Could you pass the phone, please?' with 'please' at the end.",
+        options: [
+          "True — 'Please' at the end is very natural and polite",
+          "False — 'Please' is never allowed at the end"
+        ],
+        answer: 0,
+        explanation: "Yes! Both 'Could you please pass...' and 'Could you pass..., please?' are correct."
+      },
+      {
+        type: "mcq",
+        question: "Which verb form is correct after 'Could you please'?",
+        options: [
+          "Base verb (e.g. give, help, open)",
+          "Past verb (e.g. gave, helped, opened)",
+          "-ing verb (e.g. giving, helping, opening)",
+          "-ed verb (e.g. closed, walked)"
+        ],
+        answer: 0,
+        explanation: "Always use the base form of the verb after 'Could you'."
+      }
+    ],
+    quizQuestions: [
+      {
+        question: "Choose the grammatically correct polite request:",
+        options: [
+          "Could you please help me?",
+          "Could you helping me?",
+          "Could you helped me?",
+          "Could you helps me?"
+        ],
+        answer: 0,
+        explanation: "'Could you' must be followed by base verb 'help'."
+      },
+      {
+        question: "Complete: 'Could you please ______ me some water?'",
+        options: ["bring", "brought", "bringing", "brings"],
+        answer: 0,
+        explanation: "'Bring' is the base verb."
+      },
+      {
+        question: "You want your classmate to give you a pen. What do you say?",
+        options: [
+          "Could you please give me a pen?",
+          "Could you gave me a pen?",
+          "Could you giving me a pen?",
+          "You give me a pen now."
+        ],
+        answer: 0,
+        explanation: "'Could you please give me a pen?' is polite and uses the base verb 'give'."
+      },
+      {
+        question: "Complete: 'Could you please ______ the fan?'",
+        options: ["turn off", "turned off", "turning off", "turns off"],
+        answer: 0,
+        explanation: "Base form 'turn off' is correct."
+      },
+      {
+        question: "A friend is speaking too fast. You politely ask: 'Could you please ______ that?'",
+        options: ["repeat", "repeated", "repeating", "repeats"],
+        answer: 0,
+        explanation: "'Could you please repeat that?' uses the base verb 'repeat'."
+      }
+    ]
+  },
+  {
+    id: "how_much_price",
+    number: "08",
+    title: "How Much — Singular and Plural",
+    subtitle: "Asking about price for one and multiple items",
+    icon: "🏷️",
+    color: "#0d9488",
+    active: true,
+    summary: "We use 'How much...?' to ask about the price of something. Rule: Use 'How much is' for ONE item (singular) and 'How much are' for MORE THAN ONE item (plural). Examples: 'How much is this bag?' (1 bag) vs 'How much are these shoes?' (2 shoes).",
+    explanationGuide: {
+      kyun: {
+        title: "Kyun Istemal Hota Hai? (Why do we use it?)",
+        urdu: "Bazaar, dukaan ya shopping mall mein kisi bhi cheez ki qeemat (price) maloom karne ke liye.",
+        english: "To ask the price or cost of an item or multiple items in everyday shopping and life."
+      },
+      kaise: {
+        title: "Kaise Istemal Hota Hai? (How is it formed?)",
+        urdu: "Agar aik cheez (singular) ho to 'How much is' bolte hain. Agar aik se zyada cheezein (plural) hon to 'How much are' bolte hain.",
+        english: "Use 'How much is' + singular noun. Use 'How much are' + plural noun.",
+        formula: "ONE ITEM: How much is + singular item?  •  MULTIPLE ITEMS: How much are + plural items?"
+      },
+      kisLiye: {
+        title: "Kis Liye Istemal Hota Hai? (When & What for?)",
+        urdu: "Rozmarrah khareedari (shopping) mein kapre, joote, phone, kitaabein aur deegar cheezon ki qeemat poochne ke liye.",
+        english: "Use it whenever you go shopping or ask anyone how much something costs.",
+        points: [
+          "🛍️ ONE ITEM (Singular): How much is this phone? / How much is that bag?",
+          "👟 MULTIPLE ITEMS (Plural): How much are these shoes? / How much are those books?",
+          "💡 Pronouns for Singular: How much is this? / How much is that? / How much is it?",
+          "💡 Pronouns for Plural: How much are these? / How much are those? / How much are they?",
+          "⚠️ CORE RULE: IS = 1 item (phone, bag, shirt) • ARE = 2+ items (shoes, books, glasses)."
+        ]
+      },
+      audioNarration: "Topic 8: How Much — Singular and Plural. Why do we use it? We use 'How much' to ask the price of something. How is it formed? For one item, use 'How much is': How much is this phone? How much is that bag? For multiple items, use 'How much are': How much are these shoes? How much are those books? Remember: use 'is' for one item and 'are' for more than one."
+    },
+    vocab: [
+      { word: "How much is this?", category: "Singular Price", example: "How much is this? (One item near you)" },
+      { word: "How much is that?", category: "Singular Price", example: "How much is that? (One item further away)" },
+      { word: "How much is the phone?", category: "Singular Price", example: "How much is the phone? (Single phone)" },
+      { word: "How much is this bag?", category: "Singular Price", example: "How much is this bag? (Single bag)" },
+      { word: "How much is that shirt?", category: "Singular Price", example: "How much is that shirt? (Single shirt)" },
+      { word: "How much is this book?", category: "Singular Price", example: "How much is this book? (Single book)" },
+      { word: "How much are these?", category: "Plural Price", example: "How much are these? (Multiple items near you)" },
+      { word: "How much are those?", category: "Plural Price", example: "How much are those? (Multiple items far)" },
+      { word: "How much are the shoes?", category: "Plural Price", example: "How much are the shoes? (Pair of shoes)" },
+      { word: "How much are these bags?", category: "Plural Price", example: "How much are these bags? (Multiple bags)" },
+      { word: "How much are those books?", category: "Plural Price", example: "How much are those books? (Multiple books)" },
+      { word: "How much are the glasses?", category: "Plural Price", example: "How much are the glasses? (Plural item)" }
+    ],
+    examples: [
+      { english: "How much is this phone?", note: "Singular: 1 phone -> uses 'is'" },
+      { english: "How much are these phones?", note: "Plural: 2+ phones -> uses 'are'" },
+      { english: "How much is that bag?", note: "Singular: 1 bag -> uses 'is'" },
+      { english: "How much are those bags?", note: "Plural: 2+ bags -> uses 'are'" },
+      { english: "How much are the shoes?", note: "Plural: shoes -> uses 'are'" },
+      { english: "How much is the chair?", note: "Singular: chair -> uses 'is'" }
+    ],
+    practiceQuestions: [
+      {
+        type: "choose_sentence",
+        question: "Choose the correct sentence to ask the price of one bag:",
+        options: [
+          "How much is this bag?",
+          "How much are this bag?",
+          "How much is these bag?",
+          "How much are this bags?"
+        ],
+        answer: 0,
+        explanation: "'This bag' is singular (one item), so we use 'How much is'."
+      },
+      {
+        type: "choose_sentence",
+        question: "Choose the correct sentence to ask the price of multiple shoes:",
+        options: [
+          "How much are these shoes?",
+          "How much is these shoes?",
+          "How much are this shoes?",
+          "How much is those shoes?"
+        ],
+        answer: 0,
+        explanation: "'Shoes' is plural, so we use 'How much are these shoes?'."
+      },
+      {
+        type: "fill",
+        question: "How much _____ that phone?",
+        options: ["is", "are", "am", "be"],
+        answer: "is",
+        explanation: "'That phone' is singular, so we use 'is'."
+      },
+      {
+        type: "fill",
+        question: "How much _____ these shoes?",
+        options: ["are", "is", "am", "be"],
+        answer: "are",
+        explanation: "'These shoes' are plural, so we use 'are'."
+      },
+      {
+        type: "mcq",
+        question: "You point to ONE shirt in a shop. What do you ask?",
+        options: [
+          "How much is that shirt?",
+          "How much are that shirt?",
+          "How much is those shirts?",
+          "How much are that shirts?"
+        ],
+        answer: 0,
+        explanation: "'That shirt' is one item, so use 'How much is'."
+      }
+    ],
+    quizQuestions: [
+      {
+        question: "Complete: 'How much _____ this bag?'",
+        options: ["is", "are", "am", "be"],
+        answer: 0,
+        explanation: "'This bag' is singular, so we use 'is'."
+      },
+      {
+        question: "Complete: 'How much _____ those books?'",
+        options: ["are", "is", "am", "be"],
+        answer: 0,
+        explanation: "'Those books' is plural, so we use 'are'."
+      },
+      {
+        question: "Which question is correct for multiple shirts?",
+        options: [
+          "How much are these shirts?",
+          "How much is these shirts?",
+          "How much are this shirt?",
+          "How much is this shirts?"
+        ],
+        answer: 0,
+        explanation: "'These shirts' is plural, so we use 'How much are'."
+      },
+      {
+        question: "Complete: 'How much _____ they?'",
+        options: ["are", "is", "am", "be"],
+        answer: 0,
+        explanation: "'They' is plural, so we use 'are': 'How much are they?'."
+      },
+      {
+        question: "'How much is the pen?' — Why do we use 'is' here?",
+        options: [
+          "Because 'the pen' is singular (one pen)",
+          "Because 'the pen' is plural",
+          "Because 'is' means past tense",
+          "Because pens are always plural"
+        ],
+        answer: 0,
+        explanation: "We use 'is' because 'the pen' is a single item."
+      }
+    ]
   }
 ];
 

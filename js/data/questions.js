@@ -1,4 +1,4 @@
-﻿// Home Academy Beginner Question Bank (A1 Level)
+// Home Academy Beginner Question Bank (A1 Level)
 
 export const QUESTIONS_DATABASE = [
   {
@@ -200,6 +200,46 @@ export const QUESTIONS_DATABASE = [
     difficulty: 'Beginner',
     xpReward: 10,
     funFact: 'Yellow is one of Home Academy logo colors!'
+  },
+  {
+    id: 'q21',
+    question: 'Complete the polite request: "Could you please ______ the door?"',
+    options: ['open', 'opening', 'opened', 'opens'],
+    correctAnswer: 'open',
+    category: 'Grammar',
+    difficulty: 'Beginner',
+    xpReward: 10,
+    funFact: 'Always use the base verb after "Could you"!'
+  },
+  {
+    id: 'q22',
+    question: 'Asking price for ONE item: "How much ______ this bag?"',
+    options: ['is', 'are', 'am', 'be'],
+    correctAnswer: 'is',
+    category: 'Grammar',
+    difficulty: 'Beginner',
+    xpReward: 10,
+    funFact: 'Use "is" for one item (singular)!'
+  },
+  {
+    id: 'q23',
+    question: 'Asking price for multiple items: "How much ______ these shoes?"',
+    options: ['are', 'is', 'am', 'be'],
+    correctAnswer: 'are',
+    category: 'Grammar',
+    difficulty: 'Beginner',
+    xpReward: 10,
+    funFact: 'Use "are" for plural items (shoes, books)!'
+  },
+  {
+    id: 'q24',
+    question: 'Complete the polite question: "Could you pass the phone, ______?"',
+    options: ['please', 'thank', 'sorry', 'welcome'],
+    correctAnswer: 'please',
+    category: 'Conversations',
+    difficulty: 'Beginner',
+    xpReward: 10,
+    funFact: '"Please" makes requests extra polite.'
   }
 ];
 
@@ -267,5 +307,21 @@ export const PICTURE_QUIZ_QUESTIONS = [
     options: ['Shoes', 'Shirt', 'Hat', 'Glasses'],
     correctAnswer: 'Shoes',
     hint: 'You tie the laces before running.'
+  },
+  {
+    id: 'pq9',
+    imageEmoji: '🚪',
+    question: 'What do you politely ask to open? ("Could you please open the ______?")',
+    options: ['Door', 'Pencil', 'Chair', 'Shoe'],
+    correctAnswer: 'Door',
+    hint: 'You open it to enter the English classroom.'
+  },
+  {
+    id: 'pq10',
+    imageEmoji: '🏷️',
+    question: 'What do we ask when we want to know the price of this item?',
+    options: ['How much is it?', 'Where are you going?', 'What time is it?', 'Who is he?'],
+    correctAnswer: 'How much is it?',
+    hint: 'We use "How much" to ask about price or cost.'
   }
 ];

@@ -421,7 +421,7 @@ export function renderConceptVisual(topicId, questionObj = {}) {
   }
 
   // Topic 6: What Color + Genitive
-  if (topicId === 'what_color' || topicId === 'topic_06') {
+  if (topicId === 'what_color' || topicId === 'topic_06' || topicId === 'what_color_genitive_s') {
     return `
       <div class="creative-concept-card" style="margin-bottom: 20px; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-left: 5px solid #DC2626; border-radius: var(--radius-md); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 12px;">
@@ -439,6 +439,54 @@ export function renderConceptVisual(topicId, questionObj = {}) {
         </div>
         <span class="badge" style="background: #FEE2E2; color: #991B1B; font-weight: 700; font-size: 0.75rem;">
           Compound Structure
+        </span>
+      </div>
+    `;
+  }
+
+  // Topic 7: Could — Polite Requests
+  if (topicId === 'could_requests' || topicId === 'topic_07') {
+    return `
+      <div class="creative-concept-card" style="margin-bottom: 20px; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-left: 5px solid #7C3AED; border-radius: var(--radius-md); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; background: #EDE9FE; color: #7C3AED; font-weight: 800;">
+            🤝
+          </span>
+          <div>
+            <div style="font-size: 0.72rem; font-weight: 800; color: #7C3AED; text-transform: uppercase; letter-spacing: 0.04em;">
+              POLITE REQUEST: COULD YOU + BASE VERB
+            </div>
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--ha-navy);">
+              Could you please + [Base Verb] (open / help / pass)?
+            </div>
+          </div>
+        </div>
+        <span class="badge" style="background: #EDE9FE; color: #6D28D9; font-weight: 700; font-size: 0.75rem;">
+          Polite Request
+        </span>
+      </div>
+    `;
+  }
+
+  // Topic 8: How Much — Singular and Plural Price
+  if (topicId === 'how_much_price' || topicId === 'topic_08') {
+    return `
+      <div class="creative-concept-card" style="margin-bottom: 20px; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-left: 5px solid #0D9488; border-radius: var(--radius-md); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 8px; background: #CCFBF1; color: #0D9488; font-weight: 800;">
+            🏷️
+          </span>
+          <div>
+            <div style="font-size: 0.72rem; font-weight: 800; color: #0D9488; text-transform: uppercase; letter-spacing: 0.04em;">
+              PRICE INQUIRY: 1 ITEM vs 2+ ITEMS
+            </div>
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--ha-navy);">
+              Singular (1): How much is...? • Plural (2+): How much are...?
+            </div>
+          </div>
+        </div>
+        <span class="badge" style="background: #CCFBF1; color: #0F766E; font-weight: 700; font-size: 0.75rem;">
+          Price Inquiry
         </span>
       </div>
     `;

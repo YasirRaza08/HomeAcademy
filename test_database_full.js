@@ -21,8 +21,10 @@ async function runTests() {
   // 3. Curriculum and Roleplays seeded correctly
   const topics = await db.getCurriculumTopics(true);
   console.log(`✓ Curriculum topics count: ${topics.length}`);
-  assert.strictEqual(topics.length, 6);
+  assert.strictEqual(topics.length, 8);
   assert.strictEqual(topics[0].id, 'adjectives');
+  assert.strictEqual(topics[6].id, 'could_requests');
+  assert.strictEqual(topics[7].id, 'how_much_price');
 
   const roleplays = await db.getRoleplays(true);
   console.log(`✓ Roleplay presentations count: ${roleplays.length}`);

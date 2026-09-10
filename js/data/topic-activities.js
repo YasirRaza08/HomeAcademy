@@ -834,6 +834,282 @@ export const TOPIC_QUESTION_BANKS = {
       answer: 0,
       explanation: '"What color is Sir Zubair\'s whiteboard marker?" is completely accurate.'
     }
+  ],
+
+  could_requests: [
+    {
+      id: 'cr_01',
+      topicId: 'could_requests',
+      type: 'choose_sentence',
+      question: 'Which sentence is a correct polite request?',
+      options: ['Could you please open the door?', 'Could you opening the door?', 'Could you opened the door?', 'Could you opens the door?'],
+      answer: 0,
+      explanation: 'We always use "Could you" + base verb ("open").'
+    },
+    {
+      id: 'cr_02',
+      topicId: 'could_requests',
+      type: 'fill',
+      question: 'Could you please _____ (close) the window?',
+      options: ['close', 'closed', 'closing', 'closes'],
+      answer: 0,
+      explanation: 'After "Could you please", always use the base form "close".'
+    },
+    {
+      id: 'cr_03',
+      topicId: 'could_requests',
+      type: 'mcq',
+      question: 'You want someone to hand you a pen. How do you ask politely?',
+      options: ['Could you please pass the pen?', 'Could you passing the pen?', 'You give pen now.', 'Could you passed the pen?'],
+      answer: 0,
+      explanation: '"Could you please pass the pen?" is respectful and grammatically correct.'
+    },
+    {
+      id: 'cr_04',
+      topicId: 'could_requests',
+      type: 'choose_sentence',
+      question: 'Choose the correct request to ask someone to speak more slowly:',
+      options: ['Could you please speak slowly?', 'Could you speaking slowly?', 'Could you spoke slowly?', 'Could you speaks slowly?'],
+      answer: 0,
+      explanation: '"Speak" is the base verb form.'
+    },
+    {
+      id: 'cr_05',
+      topicId: 'could_requests',
+      type: 'true_false',
+      question: 'True or False: We can say "Could you pass the phone, please?" with "please" at the end.',
+      options: ['True — "Please" can naturally be placed at the beginning or at the end', 'False — "Please" is only allowed at the very start of a sentence'],
+      answer: 0,
+      explanation: 'Both "Could you please pass..." and "Could you pass..., please?" are polite and correct.'
+    },
+    {
+      id: 'cr_06',
+      topicId: 'could_requests',
+      type: 'mcq',
+      question: 'Complete: "Could you please ______ me some water?"',
+      options: ['bring', 'brought', 'bringing', 'brings'],
+      answer: 0,
+      explanation: 'Base form of the verb is "bring".'
+    },
+    {
+      id: 'cr_07',
+      topicId: 'could_requests',
+      type: 'fill',
+      question: 'Could you please _____ (help) me with this exercise?',
+      options: ['help', 'helped', 'helping', 'helps'],
+      answer: 0,
+      explanation: 'Use the base verb "help" after "Could you please".'
+    },
+    {
+      id: 'cr_08',
+      topicId: 'could_requests',
+      type: 'choose_sentence',
+      question: 'You did not understand what the teacher said. What is the polite request?',
+      options: ['Could you please repeat that?', 'Could you repeating that?', 'Could you repeated that?', 'What you said repeat.'],
+      answer: 0,
+      explanation: '"Could you please repeat that?" uses base verb "repeat".'
+    },
+    {
+      id: 'cr_09',
+      topicId: 'could_requests',
+      type: 'mcq',
+      question: 'It is dark in the classroom. What do you politely say?',
+      options: ['Could you please turn on the light?', 'Could you turned on the light?', 'Could you turning on the light?', 'Could you turns on the light?'],
+      answer: 0,
+      explanation: 'Base form "turn on" is correct.'
+    },
+    {
+      id: 'cr_10',
+      topicId: 'could_requests',
+      type: 'true_false',
+      question: 'True or False: In "Could you please helping me?", the verb form "helping" is correct.',
+      options: ['False — We must use base verb "help", not the "-ing" form', 'True — "-ing" verbs are always used with could'],
+      answer: 0,
+      explanation: 'Always use base verb: "Could you please help me?".'
+    },
+    {
+      id: 'cr_11',
+      topicId: 'could_requests',
+      type: 'fill',
+      question: 'Could you please _____ (give) me your notebook for a minute?',
+      options: ['give', 'gave', 'giving', 'given'],
+      answer: 0,
+      explanation: '"Give" is the base verb form.'
+    },
+    {
+      id: 'cr_12',
+      topicId: 'could_requests',
+      type: 'choose_sentence',
+      question: 'Choose the correct request to ask someone to wait:',
+      options: ['Could you please wait for a moment?', 'Could you waiting for a moment?', 'Could you waited for a moment?', 'Could you to wait for a moment?'],
+      answer: 0,
+      explanation: '"Wait" is the base verb without "to" or "-ing".'
+    },
+    {
+      id: 'cr_13',
+      topicId: 'could_requests',
+      type: 'mcq',
+      question: 'Which of the following is the most polite way to ask for a favor?',
+      options: ['Could you please explain this rule?', 'Explain this rule to me.', 'You must explain this rule.', 'Explain this rule now.'],
+      answer: 0,
+      explanation: '"Could you please..." is polite and respectful.'
+    },
+    {
+      id: 'cr_14',
+      topicId: 'could_requests',
+      type: 'fill',
+      question: 'Could you please _____ (turn off) the fan? It is cold.',
+      options: ['turn off', 'turned off', 'turning off', 'turns off'],
+      answer: 0,
+      explanation: '"Turn off" is the base phrasal verb.'
+    },
+    {
+      id: 'cr_15',
+      topicId: 'could_requests',
+      type: 'choose_sentence',
+      question: 'Which formula accurately represents a polite request with "Could"?',
+      options: ['Could you + base verb + ...?', 'Could you + verb-ing + ...?', 'Could you + past verb + ...?', 'Could you + to + verb + ...?'],
+      answer: 0,
+      explanation: 'The formula is [Could you + base verb + ...?].'
+    }
+  ],
+
+  how_much_price: [
+    {
+      id: 'hm_01',
+      topicId: 'how_much_price',
+      type: 'choose_sentence',
+      question: 'Choose the correct question to ask the price of ONE bag:',
+      options: ['How much is this bag?', 'How much are this bag?', 'How much is these bag?', 'How much are this bags?'],
+      answer: 0,
+      explanation: '"This bag" is singular (1 item), so we use "How much is".'
+    },
+    {
+      id: 'hm_02',
+      topicId: 'how_much_price',
+      type: 'choose_sentence',
+      question: 'Choose the correct question to ask the price of MULTIPLE shoes:',
+      options: ['How much are these shoes?', 'How much is these shoes?', 'How much are this shoes?', 'How much is those shoes?'],
+      answer: 0,
+      explanation: '"Shoes" is plural (2+ items), so we use "How much are".'
+    },
+    {
+      id: 'hm_03',
+      topicId: 'how_much_price',
+      type: 'fill',
+      question: 'How much _____ that smartphone on the table?',
+      options: ['is', 'are', 'am', 'be'],
+      answer: 0,
+      explanation: '"That smartphone" is singular, so we use "is".'
+    },
+    {
+      id: 'hm_04',
+      topicId: 'how_much_price',
+      type: 'fill',
+      question: 'How much _____ these books in the bookstore?',
+      options: ['are', 'is', 'am', 'be'],
+      answer: 0,
+      explanation: '"These books" are plural, so we use "are".'
+    },
+    {
+      id: 'hm_05',
+      topicId: 'how_much_price',
+      type: 'mcq',
+      question: 'You want to know the price of ONE jacket. What do you say?',
+      options: ['How much is that jacket?', 'How much are that jacket?', 'How much is those jackets?', 'How much are this jacket?'],
+      answer: 0,
+      explanation: 'Singular jacket requires "is".'
+    },
+    {
+      id: 'hm_06',
+      topicId: 'how_much_price',
+      type: 'true_false',
+      question: 'True or False: We ask "How much are this phone?" for a single phone.',
+      options: ['False — A single phone is singular, so we must say "How much is this phone?"', 'True — "are" can be used for any phone'],
+      answer: 0,
+      explanation: 'Use "is" for one phone: "How much is this phone?".'
+    },
+    {
+      id: 'hm_07',
+      topicId: 'how_much_price',
+      type: 'choose_sentence',
+      question: 'Which question correctly asks the price of glasses (plural item)?',
+      options: ['How much are these glasses?', 'How much is these glasses?', 'How much is this glasses?', 'How much are that glasses?'],
+      answer: 0,
+      explanation: '"Glasses" is always grammatically plural and takes "are".'
+    },
+    {
+      id: 'hm_08',
+      topicId: 'how_much_price',
+      type: 'fill',
+      question: 'How much _____ the ticket to Karachi?',
+      options: ['is', 'are', 'am', 'be'],
+      answer: 0,
+      explanation: '"The ticket" is singular, so use "is".'
+    },
+    {
+      id: 'hm_09',
+      topicId: 'how_much_price',
+      type: 'mcq',
+      question: 'Complete: "Look at those watches! How much ______?"',
+      options: ['are they', 'is it', 'is they', 'are it'],
+      answer: 0,
+      explanation: '"Watches" is plural, so we use "are they".'
+    },
+    {
+      id: 'hm_10',
+      topicId: 'how_much_price',
+      type: 'true_false',
+      question: 'True or False: We use "How much is" for singular items and "How much are" for plural items.',
+      options: ['True — "is" is for singular (1 item) and "are" is for plural (2+ items)', 'False — "How much" is only ever followed by "are"'],
+      answer: 0,
+      explanation: 'Exactly right! "is" for singular, "are" for plural.'
+    },
+    {
+      id: 'hm_11',
+      topicId: 'how_much_price',
+      type: 'choose_sentence',
+      question: 'You hold up ONE pen. Which question is correct?',
+      options: ['How much is this pen?', 'How much are this pen?', 'How much is these pens?', 'How much are this pens?'],
+      answer: 0,
+      explanation: '"This pen" is singular, requiring "is".'
+    },
+    {
+      id: 'hm_12',
+      topicId: 'how_much_price',
+      type: 'fill',
+      question: 'How much _____ those blue shirts on the rack?',
+      options: ['are', 'is', 'am', 'be'],
+      answer: 0,
+      explanation: '"Those blue shirts" is plural, so use "are".'
+    },
+    {
+      id: 'hm_13',
+      topicId: 'how_much_price',
+      type: 'mcq',
+      question: 'A customer points to a laptop: "How much ______ it?"',
+      options: ['is', 'are', 'were', 'am'],
+      answer: 0,
+      explanation: '"It" is singular, so "How much is it?".'
+    },
+    {
+      id: 'hm_14',
+      topicId: 'how_much_price',
+      type: 'choose_sentence',
+      question: 'Which question correctly asks the price of multiple bags?',
+      options: ['How much are those bags?', 'How much is those bags?', 'How much are that bags?', 'How much is that bag? (This is singular)'],
+      answer: 0,
+      explanation: '"Those bags" is plural, so use "How much are those bags?".'
+    },
+    {
+      id: 'hm_15',
+      topicId: 'how_much_price',
+      type: 'fill',
+      question: '"How much is this chair?" — "It _____ 50 dollars."',
+      options: ['is', 'are', 'have', 'were'],
+      answer: 0,
+      explanation: 'Singular chair: "It is 50 dollars".'
+    }
   ]
 };
 
@@ -1009,6 +1285,62 @@ export const TOPIC_ACTIVITIES = {
     sentenceBuilder: [
       { prompt: "Ask color of Ali's car:", chips: ['What', 'color', 'is', "Ali's", 'car', '?'], correct: "What color is Ali's car ?" },
       { prompt: "Ask color of Sara's pens:", chips: ['What', 'color', 'are', "Sara's", 'pens', '?'], correct: "What color are Sara's pens ?" }
+    ]
+  },
+  could_requests: {
+    title: 'Could Polite Requests Activities',
+    icon: '🤝',
+    color: '#7c3aed',
+    matching: [
+      { left: 'open', right: 'the door, please', category: 'Action' },
+      { left: 'close', right: 'the window, please', category: 'Action' },
+      { left: 'pass', right: 'the phone, please', category: 'Favor' },
+      { left: 'bring', right: 'me some water, please', category: 'Favor' },
+      { left: 'speak', right: 'slowly, please', category: 'Speech' },
+      { left: 'repeat', right: 'that, please', category: 'Speech' }
+    ],
+    scrambles: [
+      { words: ['Could', 'you', 'please', 'open', 'the', 'door'], answer: 'Could you please open the door?' },
+      { words: ['Could', 'you', 'pass', 'the', 'phone', 'please'], answer: 'Could you pass the phone, please?' },
+      { words: ['Could', 'you', 'please', 'help', 'me', 'with', 'this'], answer: 'Could you please help me with this?' },
+      { words: ['Could', 'you', 'please', 'speak', 'slowly'], answer: 'Could you please speak slowly?' }
+    ],
+    trueFalse: [
+      { statement: 'We say "Could you please open the door?" with the base verb "open".', isTrue: true, explanation: 'Correct! Always use base verb after "Could you".' },
+      { statement: 'It is correct to say "Could you please helping me?".', isTrue: false, explanation: 'False! Never use "-ing" after "Could you". Say "Could you please help me?".' },
+      { statement: 'Placing "please" at the end like "Could you pass the pen, please?" is completely polite.', isTrue: true, explanation: 'Correct! "Please" can be at the start or end.' }
+    ],
+    sentenceBuilder: [
+      { prompt: "Build polite request to open the door:", chips: ['Could', 'you', 'please', 'open', 'the', 'door', '?'], correct: "Could you please open the door ?" },
+      { prompt: "Build polite request to pass the phone:", chips: ['Could', 'you', 'pass', 'the', 'phone', ',', 'please', '?'], correct: "Could you pass the phone , please ?" }
+    ]
+  },
+  how_much_price: {
+    title: 'How Much Price Activities',
+    icon: '🏷️',
+    color: '#0d9488',
+    matching: [
+      { left: 'How much is', right: 'this phone? (1 item)', category: 'Singular' },
+      { left: 'How much are', right: 'these shoes? (2+ items)', category: 'Plural' },
+      { left: 'How much is', right: 'that bag? (1 item)', category: 'Singular' },
+      { left: 'How much are', right: 'those books? (2+ items)', category: 'Plural' },
+      { left: 'How much is', right: 'it? (Singular pronoun)', category: 'Singular' },
+      { left: 'How much are', right: 'they? (Plural pronoun)', category: 'Plural' }
+    ],
+    scrambles: [
+      { words: ['How', 'much', 'is', 'this', 'phone'], answer: 'How much is this phone?' },
+      { words: ['How', 'much', 'are', 'these', 'shoes'], answer: 'How much are these shoes?' },
+      { words: ['How', 'much', 'is', 'that', 'leather', 'bag'], answer: 'How much is that leather bag?' },
+      { words: ['How', 'much', 'are', 'those', 'new', 'books'], answer: 'How much are those new books?' }
+    ],
+    trueFalse: [
+      { statement: 'For ONE item (singular), we always ask "How much is...?"', isTrue: true, explanation: 'Correct! "is" is for one item (phone, bag, shirt).' },
+      { statement: 'For MULTIPLE items like shoes or books, we ask "How much is these shoes?".', isTrue: false, explanation: 'False! Multiple items require "are": "How much are these shoes?".' },
+      { statement: '"How much are they?" is the correct plural question for multiple items.', isTrue: true, explanation: 'Correct! "They" and "are" are used for plural items.' }
+    ],
+    sentenceBuilder: [
+      { prompt: "Ask price of one phone:", chips: ['How', 'much', 'is', 'this', 'phone', '?'], correct: "How much is this phone ?" },
+      { prompt: "Ask price of multiple shoes:", chips: ['How', 'much', 'are', 'these', 'shoes', '?'], correct: "How much are these shoes ?" }
     ]
   }
 };
