@@ -419,7 +419,7 @@ export function renderFullTest(container, onNavigate) {
 
           <p style="font-size: 1.05rem; color: var(--ha-text-muted); max-width: 580px; margin: 0 auto 24px; line-height: 1.6;">
             ${res.passed 
-              ? `Outstanding achievement, <strong>${student.name}</strong>! You mastered the 6 class topics taught by <strong>Sir Zubair</strong>.`
+              ? `Outstanding achievement, <strong>${student.name}</strong>! You mastered the ${activeTopics.length} class topics taught by <strong>Sir Zubair</strong>.`
               : `You scored ${res.percent}%. 80% is required to pass the exam. Review your topic breakdown and mistakes below, then take a fresh test!`
             }
           </p>
