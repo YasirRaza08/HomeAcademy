@@ -68,6 +68,9 @@ class StateManager {
         if (!Array.isArray(parsed.roleplays) || parsed.roleplays.length === 0) {
           parsed.roleplays = JSON.parse(JSON.stringify(OFFICIAL_ROLEPLAYS));
         }
+        if (!Array.isArray(parsed.customActivities)) {
+          parsed.customActivities = [];
+        }
 
         // Ensure all students have a clean roleplayProgress object
         if (Array.isArray(parsed.students)) {
@@ -115,6 +118,7 @@ class StateManager {
       curriculumTopics: JSON.parse(JSON.stringify(OFFICIAL_TOPICS)),
       curriculumCustomized: false,
       roleplays: JSON.parse(JSON.stringify(OFFICIAL_ROLEPLAYS)),
+      customActivities: [],
       achievements: ACHIEVEMENTS,
       teacherProfile: {
         name: 'Sir Zubair',
@@ -208,6 +212,12 @@ class StateManager {
       const rpRes = await apiClient.getRoleplays().catch(() => null);
       if (rpRes && Array.isArray(rpRes.roleplays) && rpRes.roleplays.length > 0) {
         this.state.roleplays = rpRes.roleplays;
+      }
+
+      // 3b. Sync Custom Activities
+      const actRes = await apiClient.getActivities().catch(() => null);
+      if (actRes && Array.isArray(actRes.activities)) {
+        this.state.customActivities = actRes.activities;
       }
 
       // Keep snapshot of local student cache before refreshing from server
@@ -1053,25 +1063,134 @@ class StateManager {
     this.notify('ADMIN_STUDENT_DELETED', studentId);
   }
 
-  adminAddTopic(topicData) {
+  async adminAddTopic(topicData) {
     if (!topicData.title) throw new Error('Topic title is required.');
+    const nextNum = String((this.state.curriculumTopics.length + 1)).padStart(2, '0');
+    const rawId = topicData.id || topicData.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const topicId = rawId || `topic_${Date.now()}`;
+
     const newTopic = {
-      id: topicData.id || 'topic_' + Date.now(),
-      number: String((this.state.curriculumTopics.length + 1)).padStart(2, '0'),
-      title: topicData.title,
-      subtitle: topicData.subtitle || '',
+      id: topicId,
+      topicId: topicId,
+      number: topicData.number || nextNum,
+      title: topicData.title.trim(),
+      subtitle: (topicData.subtitle || '').trim(),
       icon: topicData.icon || '📖',
-      color: topicData.color || '#2563eb',
+      color: topicData.color || '#0A2558',
+      level: topicData.level || 'Elementary',
       active: topicData.active !== false,
-      summary: topicData.summary || '',
-      vocab: topicData.vocab || [],
-      examples: topicData.examples || [],
-      practiceQuestions: topicData.practiceQuestions || [],
-      quizQuestions: topicData.quizQuestions || []
+      summary: (topicData.summary || topicData.urduExplanation || '').trim(),
+      urduExplanation: (topicData.urduExplanation || topicData.summary || '').trim(),
+      rule: (topicData.rule || '').trim(),
+      formula: (topicData.formula || '').trim(),
+      vocab: Array.isArray(topicData.vocab) ? topicData.vocab : [],
+      examples: Array.isArray(topicData.examples) ? topicData.examples : [],
+      practiceQuestions: Array.isArray(topicData.practiceQuestions) ? topicData.practiceQuestions : [],
+      quizQuestions: Array.isArray(topicData.quizQuestions) ? topicData.quizQuestions : [],
+      isCustom: true,
+      createdBy: 'Sir Zubair'
     };
-    this.state.curriculumTopics.push(newTopic);
+
+    try {
+      const res = await apiClient.adminCreateCurriculum(newTopic);
+      if (res && res.topic) {
+        Object.assign(newTopic, res.topic);
+      }
+    } catch (e) {
+      console.warn('Backend curriculum create notice:', e.message);
+    }
+
+    const existingIdx = this.state.curriculumTopics.findIndex(t => t.id === newTopic.id);
+    if (existingIdx >= 0) {
+      this.state.curriculumTopics[existingIdx] = newTopic;
+    } else {
+      this.state.curriculumTopics.push(newTopic);
+    }
+
+    this.state.curriculumCustomized = true;
+    this.saveState();
     this.notify('ADMIN_TOPIC_ADDED', newTopic);
     return newTopic;
+  }
+
+  async adminAddActivity(activityData) {
+    if (!activityData.title) throw new Error('Activity title is required.');
+    if (!activityData.activityType) throw new Error('Activity type is required.');
+
+    if (!Array.isArray(this.state.customActivities)) {
+      this.state.customActivities = [];
+    }
+
+    let saved = {
+      id: activityData.id || ('act_' + Date.now()),
+      activityId: activityData.id || ('act_' + Date.now()),
+      topicId: activityData.topicId || 'adjectives',
+      activityType: activityData.activityType,
+      title: activityData.title.trim(),
+      instructions: activityData.instructions || '',
+      difficulty: activityData.difficulty || 'intermediate',
+      xpReward: Math.max(10, Math.min(100, parseInt(activityData.xpReward, 10) || 25)),
+      active: activityData.active !== false,
+      items: activityData.items || [],
+      pairs: activityData.pairs || [],
+      cards: activityData.cards || [],
+      scrambleItems: activityData.scrambleItems || [],
+      isCustom: true,
+      createdBy: 'Sir Zubair',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      const res = await apiClient.adminCreateActivity(activityData);
+      if (res && res.activity) {
+        saved = res.activity;
+      }
+    } catch (e) {
+      console.warn('Backend activity create notice:', e.message);
+    }
+
+    const existingIdx = this.state.customActivities.findIndex(a => a.id === saved.id || a.activityId === saved.id);
+    if (existingIdx >= 0) {
+      this.state.customActivities[existingIdx] = saved;
+    } else {
+      this.state.customActivities.unshift(saved);
+    }
+
+    this.saveState();
+    this.notify('ADMIN_ACTIVITY_ADDED', saved);
+    return saved;
+  }
+
+  async adminDeleteActivity(activityId) {
+    if (!activityId) return;
+    if (!Array.isArray(this.state.customActivities)) this.state.customActivities = [];
+    this.state.customActivities = this.state.customActivities.filter(a => a.id !== activityId && a.activityId !== activityId);
+    try {
+      await apiClient.adminDeleteActivity(activityId);
+    } catch (e) {}
+    this.saveState();
+    this.notify('ADMIN_ACTIVITY_DELETED', activityId);
+  }
+
+  async adminToggleActivity(activityId) {
+    if (!activityId) return;
+    if (!Array.isArray(this.state.customActivities)) this.state.customActivities = [];
+    const act = this.state.customActivities.find(a => a.id === activityId || a.activityId === activityId);
+    if (act) {
+      act.active = act.active === false ? true : false;
+      try {
+        await apiClient.adminToggleActivity(activityId);
+      } catch (e) {}
+      this.saveState();
+      this.notify('ADMIN_ACTIVITY_TOGGLED', act);
+    }
+  }
+
+  getCustomActivities(topicId = null) {
+    const list = Array.isArray(this.state.customActivities) ? this.state.customActivities : [];
+    const activeList = list.filter(a => a.active !== false);
+    if (!topicId) return activeList;
+    return activeList.filter(a => a.topicId === topicId || a.topicId === 'all' || a.topicId === 'general');
   }
 
   adminToggleTopic(topicId) {

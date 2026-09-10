@@ -876,24 +876,30 @@ function renderCurriculumTab(mount, topics, mainContainer, onNavigate) {
         <div>
           <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 4px;">Curriculum Topics Manager</h2>
           <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
-            Activate, deactivate, renumber or delete topics. Physical class taught by Sir Zubair.
+            Add new grammar lessons, activate, deactivate, or delete topics. Physical class taught by Sir Zubair.
           </p>
         </div>
-        <button class="btn btn-outline btn-sm" id="btn-admin-reset-curriculum">Reset to Official Topics</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-primary btn-sm" id="btn-admin-add-topic" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800;">
+            <span>+</span> Add Grammar Topic
+          </button>
+          <button class="btn btn-outline btn-sm" id="btn-admin-reset-curriculum">Reset to Official Topics</button>
+        </div>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 10px;">
         ${topics.map(t => `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); background: ${t.active !== false ? '#fff' : '#f8fafc'}; opacity: ${t.active !== false ? '1' : '0.6'};">
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="badge badge-navy">${t.number}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); background: ${t.active !== false ? '#fff' : '#f8fafc'}; opacity: ${t.active !== false ? '1' : '0.6'}; flex-wrap: wrap; gap: 10px;">
+            <div style="flex: 1; min-width: 240px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span class="badge badge-navy">Topic ${t.number}</span>
                 <strong style="font-size: 1rem; color: var(--ha-navy);">${t.title}</strong>
                 ${t.active !== false ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-outline">Inactive</span>'}
+                ${t.isCustom ? '<span class="badge badge-gold" style="font-size: 0.72rem;">⭐ Custom Added</span>' : ''}
               </div>
               <p style="font-size: 0.85rem; color: var(--ha-text-muted); margin: 4px 0 0;">${t.subtitle || t.summary || ''}</p>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
               <button class="btn btn-outline btn-xs btn-toggle-topic" data-id="${t.id}">${t.active !== false ? 'Deactivate' : 'Activate'}</button>
               <button class="btn btn-danger btn-xs btn-delete-topic" data-id="${t.id}">Delete</button>
             </div>
@@ -901,7 +907,16 @@ function renderCurriculumTab(mount, topics, mainContainer, onNavigate) {
         `).join('')}
       </div>
     </div>
+
+    <!-- Add Grammar Topic Modal Container -->
+    <div id="add-topic-modal-mount"></div>
   `;
+
+  // Add Topic Button click
+  mount.querySelector('#btn-admin-add-topic')?.addEventListener('click', () => {
+    sound.playClick();
+    showAddTopicModal(mount, topics);
+  });
 
   mount.querySelectorAll('.btn-toggle-topic').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -942,6 +957,298 @@ function renderCurriculumTab(mount, topics, mainContainer, onNavigate) {
         window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
       } catch (err) {
         alert(err.message);
+      }
+    }
+  });
+}
+
+/**
+ * Modal to Add New Grammar Topic (Physical Class & Live Platform)
+ */
+function showAddTopicModal(mount, currentTopics) {
+  const modalMount = mount.querySelector('#add-topic-modal-mount');
+  if (!modalMount) return;
+
+  const nextNumber = String(currentTopics.length + 1).padStart(2, '0');
+
+  modalMount.innerHTML = `
+    <div class="modal-overlay active" id="modal-add-topic-overlay" style="position: fixed; inset: 0; background: rgba(10, 37, 88, 0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+      <div class="modal-content" style="background: #ffffff; border-radius: var(--radius-lg); max-width: 720px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 26px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+        
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--ha-border); padding-bottom: 14px; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.6rem;">📚</span>
+            <div>
+              <h3 style="font-size: 1.3rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Add New Grammar Topic</h3>
+              <p style="font-size: 0.82rem; color: var(--ha-text-muted); margin: 2px 0 0;">Topic ${nextNumber} • Instantly published to Turso Cloud DB for all students</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-close-add-topic-modal" style="padding: 4px 10px;">✕</button>
+        </div>
+
+        <form id="form-add-topic" style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- Row 1: Title & Subtitle -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">TOPIC TITLE *</label>
+              <input type="text" id="topic-title" required placeholder="e.g. Present Continuous Tense"
+                style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.9rem;" />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">SUBTITLE / QUICK CONCEPT</label>
+              <input type="text" id="topic-subtitle" placeholder="e.g. Actions happening right now"
+                style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.9rem;" />
+            </div>
+          </div>
+
+          <!-- Row 2: Level, Color & Topic ID -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">LEVEL</label>
+              <select id="topic-level" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="Elementary">Elementary (A1)</option>
+                <option value="Pre-Intermediate" selected>Pre-Intermediate (A2)</option>
+                <option value="Intermediate">Intermediate (B1)</option>
+                <option value="Upper-Intermediate">Upper-Intermediate (B2)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">ACCENT COLOR</label>
+              <select id="topic-color" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="#0A2558" selected>Navy Blue (#0A2558)</option>
+                <option value="#059669">Emerald Green (#059669)</option>
+                <option value="#2563eb">Royal Blue (#2563eb)</option>
+                <option value="#d97706">Gold (#d97706)</option>
+                <option value="#dc2626">Crimson (#dc2626)</option>
+                <option value="#7c3aed">Purple (#7c3aed)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">TOPIC SLUG / ID (OPTIONAL)</label>
+              <input type="text" id="topic-slug" placeholder="Auto-generated if blank"
+                style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.85rem;" />
+            </div>
+          </div>
+
+          <!-- Urdu Explanation -->
+          <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">URDU / ROMAN URDU EXPLANATION</label>
+            <textarea id="topic-urdu" rows="2" placeholder="Yeh tense tab use hota hai jab koi kaam baat karte waqt jari ho (jaise: Wo parh raha hai)..."
+              style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem; resize: vertical;"></textarea>
+          </div>
+
+          <!-- Rule & Formula -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">GRAMMAR RULE</label>
+              <input type="text" id="topic-rule" placeholder="e.g. Use [is / am / are] + verb with -ing"
+                style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;" />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">FORMULA STRUCTURE</label>
+              <input type="text" id="topic-formula" placeholder="e.g. Subject + is/am/are + Verb-ing + Object"
+                style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;" />
+            </div>
+          </div>
+
+          <!-- Examples (3 pairs) -->
+          <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 8px;">SAMPLE SENTENCE EXAMPLES:</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <input type="text" class="example-en" placeholder="English sentence 1 (e.g. I am reading a book.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+                <input type="text" class="example-ur" placeholder="Urdu meaning 1 (e.g. Main kitab parh raha hoon.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <input type="text" class="example-en" placeholder="English sentence 2 (e.g. They are playing football.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+                <input type="text" class="example-ur" placeholder="Urdu meaning 2 (e.g. Wo football khel rahe hain.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <input type="text" class="example-en" placeholder="English sentence 3 (e.g. She is cooking dinner.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+                <input type="text" class="example-ur" placeholder="Urdu meaning 3 (e.g. Wo khana paka rahi hai.)" style="padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Practice / Quiz Questions Builder (2 Questions) -->
+          <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 8px;">PRACTICE & QUIZ QUESTIONS (OPTIONAL):</div>
+            
+            <!-- Question 1 -->
+            <div style="padding: 10px; background: #fff; border: 1px solid var(--ha-border); border-radius: var(--radius-md); margin-bottom: 10px;">
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">QUESTION 1</label>
+              <input type="text" id="q1-text" placeholder="e.g. Look! The baby is _____ right now." style="width: 100%; padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem; margin-bottom: 6px;" />
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
+                <input type="text" id="q1-opt0" placeholder="Option A (e.g. sleeping)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q1-opt1" placeholder="Option B (e.g. sleeps)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q1-opt2" placeholder="Option C (e.g. slept)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q1-opt3" placeholder="Option D (e.g. sleep)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.75rem; color: var(--ha-navy); font-weight: 700;">
+                  Correct Option:
+                  <select id="q1-correct" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 4px;">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                  </select>
+                </div>
+                <input type="text" id="q1-exp" placeholder="Explanation (e.g. We use -ing for continuous actions)" style="width: 55%; padding: 4px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.78rem;" />
+              </div>
+            </div>
+
+            <!-- Question 2 -->
+            <div style="padding: 10px; background: #fff; border: 1px solid var(--ha-border); border-radius: var(--radius-md);">
+              <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">QUESTION 2</label>
+              <input type="text" id="q2-text" placeholder="e.g. We _____ studying for our exams." style="width: 100%; padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem; margin-bottom: 6px;" />
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
+                <input type="text" id="q2-opt0" placeholder="Option A (e.g. are)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q2-opt1" placeholder="Option B (e.g. is)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q2-opt2" placeholder="Option C (e.g. am)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+                <input type="text" id="q2-opt3" placeholder="Option D (e.g. be)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.75rem; color: var(--ha-navy); font-weight: 700;">
+                  Correct Option:
+                  <select id="q2-correct" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 4px;">
+                    <option value="0">Option A</option>
+                    <option value="1">Option B</option>
+                    <option value="2">Option C</option>
+                    <option value="3">Option D</option>
+                  </select>
+                </div>
+                <input type="text" id="q2-exp" placeholder="Explanation (e.g. 'We' takes 'are')" style="width: 55%; padding: 4px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.78rem;" />
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Submit Actions -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+            <button type="button" class="btn btn-outline" id="btn-cancel-add-topic" style="padding: 8px 16px;">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-add-topic" style="padding: 8px 22px; font-weight: 800;">
+              Publish Topic to All Students →
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  `;
+
+  // Close handlers
+  const close = () => { modalMount.innerHTML = ''; };
+  modalMount.querySelector('#btn-close-add-topic-modal')?.addEventListener('click', close);
+  modalMount.querySelector('#btn-cancel-add-topic')?.addEventListener('click', close);
+  modalMount.querySelector('#modal-add-topic-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-add-topic-overlay') close();
+  });
+
+  // Submit handler
+  modalMount.querySelector('#form-add-topic')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = modalMount.querySelector('#topic-title')?.value?.trim();
+    if (!title) return alert('Please enter a topic title.');
+
+    const subtitle = modalMount.querySelector('#topic-subtitle')?.value?.trim() || '';
+    const level = modalMount.querySelector('#topic-level')?.value || 'Elementary';
+    const color = modalMount.querySelector('#topic-color')?.value || '#0A2558';
+    const slug = modalMount.querySelector('#topic-slug')?.value?.trim();
+    const urdu = modalMount.querySelector('#topic-urdu')?.value?.trim() || '';
+    const rule = modalMount.querySelector('#topic-rule')?.value?.trim() || '';
+    const formula = modalMount.querySelector('#topic-formula')?.value?.trim() || '';
+
+    // Collect examples
+    const examples = [];
+    const enInputs = modalMount.querySelectorAll('.example-en');
+    const urInputs = modalMount.querySelectorAll('.example-ur');
+    for (let i = 0; i < enInputs.length; i++) {
+      const en = enInputs[i]?.value?.trim();
+      const ur = urInputs[i]?.value?.trim();
+      if (en) {
+        examples.push({ en, ur: ur || '', rule: rule || '' });
+      }
+    }
+
+    // Collect questions
+    const practiceQuestions = [];
+    const q1Text = modalMount.querySelector('#q1-text')?.value?.trim();
+    if (q1Text) {
+      const opts = [
+        modalMount.querySelector('#q1-opt0')?.value?.trim() || 'Option A',
+        modalMount.querySelector('#q1-opt1')?.value?.trim() || 'Option B',
+        modalMount.querySelector('#q1-opt2')?.value?.trim() || 'Option C',
+        modalMount.querySelector('#q1-opt3')?.value?.trim() || 'Option D'
+      ];
+      const correct = parseInt(modalMount.querySelector('#q1-correct')?.value || '0', 10);
+      practiceQuestions.push({
+        id: `q_${Date.now()}_1`,
+        type: 'mcq',
+        question: q1Text,
+        options: opts,
+        answer: correct,
+        correct,
+        correctAnswer: opts[correct],
+        explanation: modalMount.querySelector('#q1-exp')?.value?.trim() || ''
+      });
+    }
+
+    const q2Text = modalMount.querySelector('#q2-text')?.value?.trim();
+    if (q2Text) {
+      const opts = [
+        modalMount.querySelector('#q2-opt0')?.value?.trim() || 'Option A',
+        modalMount.querySelector('#q2-opt1')?.value?.trim() || 'Option B',
+        modalMount.querySelector('#q2-opt2')?.value?.trim() || 'Option C',
+        modalMount.querySelector('#q2-opt3')?.value?.trim() || 'Option D'
+      ];
+      const correct = parseInt(modalMount.querySelector('#q2-correct')?.value || '0', 10);
+      practiceQuestions.push({
+        id: `q_${Date.now()}_2`,
+        type: 'mcq',
+        question: q2Text,
+        options: opts,
+        answer: correct,
+        correct,
+        correctAnswer: opts[correct],
+        explanation: modalMount.querySelector('#q2-exp')?.value?.trim() || ''
+      });
+    }
+
+    const submitBtn = modalMount.querySelector('#btn-submit-add-topic');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving to Database...';
+    }
+
+    try {
+      await stateManager.adminAddTopic({
+        id: slug,
+        number: nextNumber,
+        title,
+        subtitle,
+        level,
+        color,
+        summary: urdu || subtitle,
+        urduExplanation: urdu,
+        rule,
+        formula,
+        examples,
+        practiceQuestions,
+        quizQuestions: practiceQuestions
+      });
+
+      sound.playSuccess();
+      close();
+      alert(`🎉 Grammar Topic "${title}" created successfully and saved in database!`);
+      window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
+    } catch (err) {
+      alert('Error creating topic: ' + err.message);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Publish Topic to All Students →';
       }
     }
   });
@@ -1224,18 +1531,85 @@ function renderQuizzesTab(mount, topics, students, testSummary, testAttempts) {
 // --------------------------------------------------------------------------
 function renderActivitiesTab(mount, topics, students) {
   const totalGames = students.reduce((sum, s) => sum + (s.stats?.gamesPlayed || 0), 0);
+  const customActivities = Array.isArray(stateManager.state.customActivities) ? stateManager.state.customActivities : [];
 
   mount.innerHTML = `
-    <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0;">Interactive Game Center Telemetry</h2>
-        <span class="badge badge-green" style="font-size: 0.8rem;">Total Plays: ${totalGames}</span>
+    <!-- Top Card: Activity Center & Management -->
+    <div class="ha-card" style="padding: 24px; border-top: 4px solid var(--ha-navy); margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.25rem; color: var(--ha-navy); margin: 0 0 4px;">Interactive Activities & Games Manager</h2>
+          <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0;">
+            Create new custom interactive drills, manage games, and monitor real student gameplay telemetry.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <span class="badge badge-green" style="font-size: 0.8rem; font-weight: 800;">Total Student Plays: ${totalGames}</span>
+          <button class="btn btn-primary btn-sm" id="btn-admin-add-activity" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800;">
+            <span>+</span> Add New Activity / Game
+          </button>
+        </div>
       </div>
-      <p style="font-size: 0.88rem; color: var(--ha-text-muted); margin: 0 0 20px;">
-        Tracking Sentence Scramble, Word Match, Sentence Builder, and True/False across topics.
-      </p>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+      <!-- Custom Activities Section -->
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+          Custom Teacher Activities (${customActivities.length}):
+        </div>
+
+        ${customActivities.length === 0 ? `
+          <div style="padding: 28px 20px; text-align: center; background: #f8fafc; border-radius: var(--radius-md); border: 1.5px dashed var(--ha-border);">
+            <div style="font-size: 2rem; margin-bottom: 6px;">🎮</div>
+            <strong style="color: var(--ha-navy); display: block; margin-bottom: 4px;">No custom activities created yet</strong>
+            <p style="font-size: 0.86rem; color: var(--ha-text-muted); margin: 0 0 14px;">
+              You can create custom MCQs, Fill in the blanks, Sentence Builders, Word Match, or Flashcard drills that appear live for your students!
+            </p>
+            <button class="btn btn-secondary btn-sm" id="btn-empty-add-activity" style="font-weight: 800;">
+              + Create Your First Custom Activity
+            </button>
+          </div>
+        ` : `
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${customActivities.map(act => {
+              const typeLabels = {
+                mcq: 'MCQ Quiz Drill',
+                fill: 'Fill in the Blanks',
+                builder: 'Sentence Builder',
+                matching: 'Word Match Pairs',
+                vocab: 'Vocabulary Flashcards'
+              };
+              const linkedTopic = topics.find(t => t.id === act.topicId);
+              const topicName = linkedTopic ? `Topic ${linkedTopic.number}: ${linkedTopic.title}` : (act.topicId === 'all' || act.topicId === 'general' ? 'All Topics' : act.topicId);
+
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); background: ${act.active !== false ? '#fff' : '#f8fafc'}; opacity: ${act.active !== false ? '1' : '0.6'}; flex-wrap: wrap; gap: 10px;">
+                  <div style="flex: 1; min-width: 240px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+                      <strong style="font-size: 1rem; color: var(--ha-navy);">${act.title}</strong>
+                      <span class="badge badge-navy" style="font-size: 0.72rem;">${typeLabels[act.activityType] || act.activityType}</span>
+                      <span class="badge badge-outline" style="font-size: 0.72rem;">${topicName}</span>
+                      <span class="badge badge-gold" style="font-size: 0.72rem;">+${act.xpReward || 25} XP</span>
+                      ${act.active !== false ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-outline">Inactive</span>'}
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--ha-text-muted); margin: 0;">${act.instructions || 'Custom classroom activity created by Sir Zubair'}</p>
+                  </div>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-outline btn-xs btn-toggle-act" data-id="${act.id || act.activityId}">${act.active !== false ? 'Deactivate' : 'Activate'}</button>
+                    <button class="btn btn-danger btn-xs btn-delete-act" data-id="${act.id || act.activityId}">Delete</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- System Telemetry Section -->
+      <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em;">
+        Core Activity Engine Formats:
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
         <div style="padding: 16px; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid #3b82f6;">
           <strong style="display: block; color: var(--ha-navy);">Sentence Scramble</strong>
           <span style="font-size: 0.82rem; color: var(--ha-text-muted);">Syntax & Word Order</span>
@@ -1249,12 +1623,398 @@ function renderActivitiesTab(mount, topics, students) {
           <span style="font-size: 0.82rem; color: var(--ha-text-muted);">Vocabulary Associations</span>
         </div>
         <div style="padding: 16px; background: #f8fafc; border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
-          <strong style="display: block; color: var(--ha-navy);">True / False Drills</strong>
-          <span style="font-size: 0.82rem; color: var(--ha-text-muted);">Rapid Comprehension</span>
+          <strong style="display: block; color: var(--ha-navy);">MCQs & Quizzes</strong>
+          <span style="font-size: 0.82rem; color: var(--ha-text-muted);">Instant Rule Mastery</span>
         </div>
       </div>
     </div>
+
+    <!-- Add Activity Modal Container -->
+    <div id="add-activity-modal-mount"></div>
   `;
+
+  // Handlers for Add Activity
+  const openModal = () => showAddActivityModal(mount, topics);
+  mount.querySelector('#btn-admin-add-activity')?.addEventListener('click', () => { sound.playClick(); openModal(); });
+  mount.querySelector('#btn-empty-add-activity')?.addEventListener('click', () => { sound.playClick(); openModal(); });
+
+  // Toggle & Delete handlers
+  mount.querySelectorAll('.btn-toggle-act').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      try {
+        await stateManager.adminToggleActivity(id);
+        sound.playClick();
+        window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+
+  mount.querySelectorAll('.btn-delete-act').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      if (confirm('Are you sure you want to delete this custom activity?')) {
+        try {
+          await stateManager.adminDeleteActivity(id);
+          sound.playClick();
+          window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Modal to Create New Custom Activity / Game
+ */
+function showAddActivityModal(mount, topics) {
+  const modalMount = mount.querySelector('#add-activity-modal-mount');
+  if (!modalMount) return;
+
+  modalMount.innerHTML = `
+    <div class="modal-overlay active" id="modal-add-act-overlay" style="position: fixed; inset: 0; background: rgba(10, 37, 88, 0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+      <div class="modal-content" style="background: #ffffff; border-radius: var(--radius-lg); max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 26px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+        
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--ha-border); padding-bottom: 14px; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.6rem;">🎮</span>
+            <div>
+              <h3 style="font-size: 1.3rem; color: var(--ha-navy); margin: 0; font-weight: 800;">Add New Interactive Activity</h3>
+              <p style="font-size: 0.82rem; color: var(--ha-text-muted); margin: 2px 0 0;">Create a custom drill or game for your students with persistent Turso DB storage</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-close-add-act-modal" style="padding: 4px 10px;">✕</button>
+        </div>
+
+        <form id="form-add-activity" style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- Title & Activity Type -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">ACTIVITY TITLE *</label>
+              <input type="text" id="act-title" required placeholder="e.g. Daily Verbs Sentence Builder"
+                style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.9rem;" />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">ACTIVITY TYPE *</label>
+              <select id="act-type" style="width: 100%; padding: 9px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="mcq">Multiple Choice Questions (MCQ)</option>
+                <option value="fill">Fill in the Blanks</option>
+                <option value="builder">Sentence Builder / Word Scramble</option>
+                <option value="matching">Word / Vocabulary Match</option>
+                <option value="vocab">Vocabulary Flashcards</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Target Topic & XP Reward -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">LINKED GRAMMAR TOPIC</label>
+              <select id="act-topic" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="all">General / All Topics</option>
+                ${topics.map(t => `<option value="${t.id}">Topic ${t.number}: ${t.title}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">XP REWARD</label>
+              <select id="act-xp" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="15">+15 XP</option>
+                <option value="25" selected>+25 XP (Standard)</option>
+                <option value="35">+35 XP</option>
+                <option value="50">+50 XP (Major Challenge)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">DIFFICULTY</label>
+              <select id="act-diff" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;">
+                <option value="easy">Beginner / Easy</option>
+                <option value="intermediate" selected>Intermediate</option>
+                <option value="hard">Advanced</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Instructions -->
+          <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">STUDENT INSTRUCTIONS</label>
+            <input type="text" id="act-instructions" placeholder="e.g. Choose the correct word to complete each sentence."
+              style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--ha-border); border-radius: var(--radius-md); font-size: 0.88rem;" />
+          </div>
+
+          <!-- Dynamic Items Area -->
+          <div id="act-dynamic-items-area">
+            <!-- Rendered dynamically depending on type -->
+          </div>
+
+          <!-- Submit Actions -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+            <button type="button" class="btn btn-outline" id="btn-cancel-add-act" style="padding: 8px 16px;">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-add-act" style="padding: 8px 22px; font-weight: 800;">
+              Publish Activity to All Students →
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  `;
+
+  const close = () => { modalMount.innerHTML = ''; };
+  modalMount.querySelector('#btn-close-add-act-modal')?.addEventListener('click', close);
+  modalMount.querySelector('#btn-cancel-add-act')?.addEventListener('click', close);
+  modalMount.querySelector('#modal-add-act-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-add-act-overlay') close();
+  });
+
+  const dynamicArea = modalMount.querySelector('#act-dynamic-items-area');
+  const typeSelect = modalMount.querySelector('#act-type');
+
+  function renderDynamicFields(type) {
+    if (!dynamicArea) return;
+    if (type === 'builder') {
+      dynamicArea.innerHTML = `
+        <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+          <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">SENTENCES TO BUILD:</div>
+          <p style="font-size: 0.78rem; color: var(--ha-text-muted); margin: 0 0 8px;">Enter full sentences. The platform will automatically scramble them into interactive clickable chips for students!</p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <input type="text" id="builder-s1" placeholder="Sentence 1: e.g. The students are listening to the teacher." style="padding: 8px 12px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.85rem;" />
+            <input type="text" id="builder-s2" placeholder="Sentence 2: e.g. He likes drinking cold water in summer." style="padding: 8px 12px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.85rem;" />
+          </div>
+        </div>
+      `;
+    } else if (type === 'matching') {
+      dynamicArea.innerHTML = `
+        <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+          <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">WORD MATCH PAIRS (ENGLISH ↔ URDU / MEANING):</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <input type="text" id="pair-w1" placeholder="Word 1: e.g. Generous" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              <input type="text" id="pair-m1" placeholder="Match 1: e.g. Sakhi / Fayyaz" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <input type="text" id="pair-w2" placeholder="Word 2: e.g. Ancient" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              <input type="text" id="pair-m2" placeholder="Match 2: e.g. Qadeem / Bohat purana" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <input type="text" id="pair-w3" placeholder="Word 3: e.g. Courteous" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+              <input type="text" id="pair-m3" placeholder="Match 3: e.g. Khush-akhlaq" style="padding: 7px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem;" />
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (type === 'vocab') {
+      dynamicArea.innerHTML = `
+        <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+          <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">VOCABULARY FLASHCARDS:</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 6px;">
+              <input type="text" id="vocab-w1" placeholder="English Word 1" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="vocab-m1" placeholder="Urdu Meaning" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="vocab-e1" placeholder="Example sentence" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 6px;">
+              <input type="text" id="vocab-w2" placeholder="English Word 2" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="vocab-m2" placeholder="Urdu Meaning" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="vocab-e2" placeholder="Example sentence" style="padding: 6px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      // mcq or fill
+      dynamicArea.innerHTML = `
+        <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--ha-border);">
+          <div style="font-size: 0.85rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 8px;">EXERCISE QUESTIONS:</div>
+          
+          <div style="padding: 10px; background: #fff; border: 1px solid var(--ha-border); border-radius: var(--radius-md); margin-bottom: 10px;">
+            <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">QUESTION 1</label>
+            <input type="text" id="act-q1-text" placeholder="e.g. Choose the correct word: She _____ to school daily." style="width: 100%; padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem; margin-bottom: 6px;" />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
+              <input type="text" id="act-q1-o0" placeholder="Option A (e.g. goes)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q1-o1" placeholder="Option B (e.g. go)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q1-o2" placeholder="Option C (e.g. going)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q1-o3" placeholder="Option D (e.g. gone)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 0.75rem; color: var(--ha-navy); font-weight: 700;">
+                Correct Option:
+                <select id="act-q1-correct" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 4px;">
+                  <option value="0">Option A</option>
+                  <option value="1">Option B</option>
+                  <option value="2">Option C</option>
+                  <option value="3">Option D</option>
+                </select>
+              </div>
+              <input type="text" id="act-q1-exp" placeholder="Explanation for student" style="width: 55%; padding: 4px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.78rem;" />
+            </div>
+          </div>
+
+          <div style="padding: 10px; background: #fff; border: 1px solid var(--ha-border); border-radius: var(--radius-md);">
+            <label style="display: block; font-size: 0.78rem; font-weight: 800; color: var(--ha-navy); margin-bottom: 4px;">QUESTION 2</label>
+            <input type="text" id="act-q2-text" placeholder="e.g. He is _____ than his brother." style="width: 100%; padding: 6px 10px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.82rem; margin-bottom: 6px;" />
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
+              <input type="text" id="act-q2-o0" placeholder="Option A (e.g. taller)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q2-o1" placeholder="Option B (e.g. tall)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q2-o2" placeholder="Option C (e.g. tallest)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+              <input type="text" id="act-q2-o3" placeholder="Option D (e.g. more tall)" style="padding: 5px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.8rem;" />
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 0.75rem; color: var(--ha-navy); font-weight: 700;">
+                Correct Option:
+                <select id="act-q2-correct" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 4px;">
+                  <option value="0">Option A</option>
+                  <option value="1">Option B</option>
+                  <option value="2">Option C</option>
+                  <option value="3">Option D</option>
+                </select>
+              </div>
+              <input type="text" id="act-q2-exp" placeholder="Explanation for student" style="width: 55%; padding: 4px 8px; border: 1px solid var(--ha-border); border-radius: 4px; font-size: 0.78rem;" />
+            </div>
+          </div>
+
+        </div>
+      `;
+    }
+  }
+
+  typeSelect?.addEventListener('change', (e) => {
+    renderDynamicFields(e.target.value);
+  });
+  renderDynamicFields(typeSelect?.value || 'mcq');
+
+  // Submit Handler
+  modalMount.querySelector('#form-add-activity')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = modalMount.querySelector('#act-title')?.value?.trim();
+    if (!title) return alert('Please enter an activity title.');
+
+    const activityType = modalMount.querySelector('#act-type')?.value;
+    const topicId = modalMount.querySelector('#act-topic')?.value || 'adjectives';
+    const xpReward = parseInt(modalMount.querySelector('#act-xp')?.value || '25', 10);
+    const difficulty = modalMount.querySelector('#act-diff')?.value || 'intermediate';
+    const instructions = modalMount.querySelector('#act-instructions')?.value?.trim() || '';
+
+    const payload = {
+      title,
+      activityType,
+      topicId,
+      xpReward,
+      difficulty,
+      instructions,
+      items: [],
+      pairs: [],
+      cards: [],
+      scrambleItems: []
+    };
+
+    if (activityType === 'builder') {
+      const s1 = modalMount.querySelector('#builder-s1')?.value?.trim();
+      const s2 = modalMount.querySelector('#builder-s2')?.value?.trim();
+      if (s1) payload.scrambleItems.push({ sentence: s1, words: s1.split(' ') });
+      if (s2) payload.scrambleItems.push({ sentence: s2, words: s2.split(' ') });
+      if (payload.scrambleItems.length === 0) {
+        payload.scrambleItems.push({ sentence: 'I am learning English grammar with Home Academy.', words: ['I', 'am', 'learning', 'English', 'grammar', 'with', 'Home', 'Academy.'] });
+      }
+    } else if (activityType === 'matching') {
+      for (let i = 1; i <= 3; i++) {
+        const w = modalMount.querySelector(`#pair-w${i}`)?.value?.trim();
+        const m = modalMount.querySelector(`#pair-m${i}`)?.value?.trim();
+        if (w && m) payload.pairs.push({ word: w, match: m });
+      }
+      if (payload.pairs.length === 0) {
+        payload.pairs.push({ word: 'Happy', match: 'Glad / Cheerful' }, { word: 'Big', match: 'Large / Huge' });
+      }
+    } else if (activityType === 'vocab') {
+      for (let i = 1; i <= 2; i++) {
+        const w = modalMount.querySelector(`#vocab-w${i}`)?.value?.trim();
+        const m = modalMount.querySelector(`#vocab-m${i}`)?.value?.trim();
+        const ex = modalMount.querySelector(`#vocab-e${i}`)?.value?.trim();
+        if (w) payload.cards.push({ word: w, meaning: m || '', example: ex || '' });
+      }
+      if (payload.cards.length === 0) {
+        payload.cards.push({ word: title, meaning: 'Key English vocabulary', example: 'We practice this daily.' });
+      }
+    } else {
+      // mcq / fill
+      const q1Text = modalMount.querySelector('#act-q1-text')?.value?.trim();
+      if (q1Text) {
+        const opts = [
+          modalMount.querySelector('#act-q1-o0')?.value?.trim() || 'Option A',
+          modalMount.querySelector('#act-q1-o1')?.value?.trim() || 'Option B',
+          modalMount.querySelector('#act-q1-o2')?.value?.trim() || 'Option C',
+          modalMount.querySelector('#act-q1-o3')?.value?.trim() || 'Option D'
+        ];
+        const cor = parseInt(modalMount.querySelector('#act-q1-correct')?.value || '0', 10);
+        payload.items.push({
+          id: `q_${Date.now()}_1`,
+          question: q1Text,
+          options: opts,
+          answer: cor,
+          correct: cor,
+          correctAnswer: opts[cor],
+          explanation: modalMount.querySelector('#act-q1-exp')?.value?.trim() || ''
+        });
+      }
+
+      const q2Text = modalMount.querySelector('#act-q2-text')?.value?.trim();
+      if (q2Text) {
+        const opts = [
+          modalMount.querySelector('#act-q2-o0')?.value?.trim() || 'Option A',
+          modalMount.querySelector('#act-q2-o1')?.value?.trim() || 'Option B',
+          modalMount.querySelector('#act-q2-o2')?.value?.trim() || 'Option C',
+          modalMount.querySelector('#act-q2-o3')?.value?.trim() || 'Option D'
+        ];
+        const cor = parseInt(modalMount.querySelector('#act-q2-correct')?.value || '0', 10);
+        payload.items.push({
+          id: `q_${Date.now()}_2`,
+          question: q2Text,
+          options: opts,
+          answer: cor,
+          correct: cor,
+          correctAnswer: opts[cor],
+          explanation: modalMount.querySelector('#act-q2-exp')?.value?.trim() || ''
+        });
+      }
+
+      if (payload.items.length === 0) {
+        payload.items.push({
+          id: `q_${Date.now()}_default`,
+          question: `Complete the practice for ${title}:`,
+          options: ['Correct Choice', 'Incorrect 1', 'Incorrect 2', 'Incorrect 3'],
+          answer: 0,
+          correct: 0,
+          correctAnswer: 'Correct Choice',
+          explanation: 'Good job!'
+        });
+      }
+    }
+
+    const submitBtn = modalMount.querySelector('#btn-submit-add-act');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Publishing Activity...';
+    }
+
+    try {
+      await stateManager.adminAddActivity(payload);
+      sound.playSuccess();
+      close();
+      alert(`🎉 Interactive Activity "${title}" published successfully!`);
+      window.dispatchEvent(new CustomEvent('ha:navigate', { detail: 'admin' }));
+    } catch (err) {
+      alert('Error creating activity: ' + err.message);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Publish Activity to All Students →';
+      }
+    }
+  });
 }
 
 // --------------------------------------------------------------------------

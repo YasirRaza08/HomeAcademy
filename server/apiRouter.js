@@ -752,6 +752,11 @@ export async function handleApiRequest(req, res) {
     return sendJson(res, 200, { success: true, roleplays });
   }
 
+  if (pathname === '/api/activities' && method === 'GET') {
+    const activities = await db.getActivities(false);
+    return sendJson(res, 200, { success: true, activities });
+  }
+
   // ------------------------------------------------------------------------
   // 9. TEACHER / ADMIN DASHBOARD & MANAGEMENT (SERVER-SIDE PROTECTED)
   // ------------------------------------------------------------------------
@@ -1061,6 +1066,22 @@ export async function handleApiRequest(req, res) {
     return sendJson(res, 200, { success: true, topics });
   }
 
+  if (pathname === '/api/admin/curriculum' && method === 'POST') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    try {
+      const body = await parseJsonBody(req);
+      if (!body.title || !body.title.trim()) {
+        return sendError(res, 400, 'Topic title is required');
+      }
+      const created = await db.createCurriculumTopic(body);
+      broadcastSSE('curriculum_updated', { created: created.id, title: created.title });
+      return sendJson(res, 201, { success: true, topic: created });
+    } catch (err) {
+      return sendError(res, 500, err.message);
+    }
+  }
+
   const currToggleMatch = pathname.match(/^\/api\/admin\/curriculum\/([^/]+)\/toggle$/);
   if (currToggleMatch && method === 'PATCH') {
     const admin = await requireAdminAuth(req, url);
@@ -1094,6 +1115,55 @@ export async function handleApiRequest(req, res) {
     const topics = await db.resetCurriculumTopics();
     broadcastSSE('curriculum_updated', { reset: true });
     return sendJson(res, 200, { success: true, topics });
+  }
+
+  // Admin: Activities Management
+  if (pathname === '/api/admin/activities' && method === 'GET') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    const activities = await db.getActivities(true);
+    return sendJson(res, 200, { success: true, activities });
+  }
+
+  if (pathname === '/api/admin/activities' && method === 'POST') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    try {
+      const body = await parseJsonBody(req);
+      if (!body.title || !body.title.trim()) return sendError(res, 400, 'Activity title is required');
+      if (!body.activityType) return sendError(res, 400, 'Activity type is required');
+      const activity = await db.createActivity(body);
+      broadcastSSE('activities_updated', { created: activity.id, title: activity.title });
+      return sendJson(res, 201, { success: true, activity });
+    } catch (err) {
+      return sendError(res, 500, err.message);
+    }
+  }
+
+  const actToggleMatch = pathname.match(/^\/api\/admin\/activities\/([^/]+)\/toggle$/);
+  if (actToggleMatch && method === 'PATCH') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    try {
+      const active = await db.toggleActivityActive(actToggleMatch[1]);
+      broadcastSSE('activities_updated', { activityId: actToggleMatch[1], active });
+      return sendJson(res, 200, { success: true, active });
+    } catch (err) {
+      return sendError(res, 404, err.message);
+    }
+  }
+
+  const actDeleteMatch = pathname.match(/^\/api\/admin\/activities\/([^/]+)$/);
+  if (actDeleteMatch && method === 'DELETE') {
+    const admin = await requireAdminAuth(req, url);
+    if (!admin) return sendError(res, 401, 'Unauthorized');
+    try {
+      await db.deleteActivity(actDeleteMatch[1]);
+      broadcastSSE('activities_updated', { deleted: actDeleteMatch[1] });
+      return sendJson(res, 200, { success: true, deleted: actDeleteMatch[1] });
+    } catch (err) {
+      return sendError(res, 404, err.message);
+    }
   }
 
   // Admin: Roleplay Management

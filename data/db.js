@@ -1810,6 +1810,224 @@ export async function resetCurriculumTopics() {
   return getCurriculumTopics(true);
 }
 
+export async function createCurriculumTopic(topicData) {
+  if (!topicData || !topicData.title) throw new Error('Topic title is required.');
+  const activeClient = getClient();
+  
+  const currentTopics = await getCurriculumTopics(true);
+  const nextNum = String(currentTopics.length + 1).padStart(2, '0');
+  
+  const rawId = topicData.id || topicData.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const topicId = rawId || `topic_${Date.now()}`;
+  
+  const fullTopic = {
+    id: topicId,
+    topicId: topicId,
+    number: topicData.number || nextNum,
+    title: topicData.title.trim(),
+    subtitle: (topicData.subtitle || '').trim(),
+    summary: (topicData.summary || topicData.urduExplanation || '').trim(),
+    urduExplanation: (topicData.urduExplanation || topicData.summary || '').trim(),
+    icon: topicData.icon || '📖',
+    color: topicData.color || '#0A2558',
+    level: topicData.level || 'Elementary',
+    rule: (topicData.rule || '').trim(),
+    formula: (topicData.formula || '').trim(),
+    active: topicData.active !== false,
+    vocab: Array.isArray(topicData.vocab) ? topicData.vocab : [],
+    examples: Array.isArray(topicData.examples) ? topicData.examples : [],
+    practiceQuestions: Array.isArray(topicData.practiceQuestions) ? topicData.practiceQuestions : [],
+    quizQuestions: Array.isArray(topicData.quizQuestions) ? topicData.quizQuestions : [],
+    isCustom: true,
+    createdBy: 'Sir Zubair',
+    createdAt: new Date().toISOString()
+  };
+
+  await activeClient.execute({
+    sql: `INSERT INTO curriculum_topics (topic_id, number, title, subtitle, summary, color, active, data_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(topic_id) DO UPDATE SET
+            number = excluded.number,
+            title = excluded.title,
+            subtitle = excluded.subtitle,
+            summary = excluded.summary,
+            color = excluded.color,
+            active = excluded.active,
+            data_json = excluded.data_json,
+            updated_at = CURRENT_TIMESTAMP`,
+    args: [
+      fullTopic.id,
+      fullTopic.number,
+      fullTopic.title,
+      fullTopic.subtitle,
+      fullTopic.summary,
+      fullTopic.color,
+      fullTopic.active ? 1 : 0,
+      JSON.stringify(fullTopic)
+    ]
+  });
+
+  // Also insert practice & quiz questions into questions table
+  const allQs = [...fullTopic.practiceQuestions, ...fullTopic.quizQuestions];
+  for (let i = 0; i < allQs.length; i++) {
+    const q = allQs[i];
+    if (q && q.question && Array.isArray(q.options) && q.options.length > 0) {
+      const qId = q.id || `${fullTopic.id}_q${i + 1}_${Date.now()}`;
+      try {
+        await activeClient.execute({
+          sql: `INSERT INTO questions (question_id, topic_id, question, question_type, options_json, correct_answer, explanation, difficulty, xp_reward, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(question_id) DO UPDATE SET
+                  question = excluded.question,
+                  options_json = excluded.options_json,
+                  correct_answer = excluded.correct_answer,
+                  explanation = excluded.explanation,
+                  updated_at = CURRENT_TIMESTAMP`,
+          args: [
+            qId,
+            fullTopic.id,
+            q.question,
+            q.type || 'mcq',
+            JSON.stringify(q.options),
+            typeof q.answer === 'number' ? q.answer : 0,
+            q.explanation || '',
+            q.difficulty || 'easy',
+            q.xpReward || 10
+          ]
+        });
+      } catch (e) {
+        console.warn('Error inserting topic question:', e.message);
+      }
+    }
+  }
+
+  return fullTopic;
+}
+
+// --------------------------------------------------------------------------
+// ACTIVITIES (CUSTOM TEACHER CREATED GAMES & DRILLS)
+// --------------------------------------------------------------------------
+export async function getActivities(includeInactive = false) {
+  const activeClient = getClient();
+  try {
+    const res = await activeClient.execute(`SELECT * FROM activities ORDER BY rowid DESC`);
+    const list = res.rows.map(r => {
+      try {
+        const parsed = JSON.parse(r.data_json || '{}');
+        return {
+          ...parsed,
+          id: r.activity_id,
+          activityId: r.activity_id,
+          topicId: r.topic_id,
+          activityType: r.activity_type,
+          title: r.title,
+          active: parsed.active !== false
+        };
+      } catch (e) {
+        return {
+          id: r.activity_id,
+          activityId: r.activity_id,
+          topicId: r.topic_id,
+          activityType: r.activity_type,
+          title: r.title,
+          active: true
+        };
+      }
+    });
+    return includeInactive ? list : list.filter(a => a.active !== false);
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function createActivity(data) {
+  if (!data || !data.title) throw new Error('Activity title is required.');
+  if (!data.activityType) throw new Error('Activity type is required.');
+  const activeClient = getClient();
+
+  // Find a valid topicId to avoid foreign key errors
+  let topicId = data.topicId || 'adjectives';
+  try {
+    const topics = await getCurriculumTopics(true);
+    if (!topics.some(t => t.id === topicId) && topics.length > 0) {
+      topicId = topics[0].id;
+    }
+  } catch (e) {}
+
+  const activityId = data.id || data.activityId || ('act_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'));
+  const activityType = data.activityType;
+  const title = data.title.trim();
+
+  const activityPayload = {
+    id: activityId,
+    activityId,
+    topicId,
+    activityType,
+    title,
+    instructions: data.instructions || '',
+    difficulty: data.difficulty || 'intermediate',
+    xpReward: Math.max(10, Math.min(100, parseInt(data.xpReward, 10) || 25)),
+    active: data.active !== false,
+    items: Array.isArray(data.items) ? data.items : (Array.isArray(data.questions) ? data.questions : []),
+    pairs: Array.isArray(data.pairs) ? data.pairs : [],
+    cards: Array.isArray(data.cards) ? data.cards : [],
+    scrambleItems: Array.isArray(data.scrambleItems) ? data.scrambleItems : [],
+    isCustom: true,
+    createdBy: 'Sir Zubair',
+    createdAt: new Date().toISOString()
+  };
+
+  await activeClient.execute({
+    sql: `INSERT INTO activities (activity_id, topic_id, activity_type, title, data_json)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(activity_id) DO UPDATE SET
+            topic_id = excluded.topic_id,
+            activity_type = excluded.activity_type,
+            title = excluded.title,
+            data_json = excluded.data_json`,
+    args: [
+      activityId,
+      topicId,
+      activityType,
+      title,
+      JSON.stringify(activityPayload)
+    ]
+  });
+
+  return activityPayload;
+}
+
+export async function deleteActivity(activityId) {
+  const activeClient = getClient();
+  await activeClient.execute({
+    sql: `DELETE FROM activities WHERE activity_id = ?`,
+    args: [activityId]
+  });
+  return true;
+}
+
+export async function toggleActivityActive(activityId) {
+  const activeClient = getClient();
+  const res = await activeClient.execute({
+    sql: `SELECT * FROM activities WHERE activity_id = ?`,
+    args: [activityId]
+  });
+  const row = res.rows[0];
+  if (!row) throw new Error('Activity not found');
+
+  let parsed = {};
+  try { parsed = JSON.parse(row.data_json || '{}'); } catch (e) {}
+  const nextActive = parsed.active === false ? true : false;
+  parsed.active = nextActive;
+
+  await activeClient.execute({
+    sql: `UPDATE activities SET data_json = ? WHERE activity_id = ?`,
+    args: [JSON.stringify(parsed), activityId]
+  });
+
+  return { active: nextActive };
+}
+
 export async function getRoleplays(includeInactive = false) {
   const activeClient = getClient();
   const sql = includeInactive

@@ -281,6 +281,14 @@ class ApiClient {
     return this.request('/api/admin/curriculum', { isAdmin: true });
   }
 
+  async adminCreateCurriculum(data) {
+    return this.request('/api/admin/curriculum', {
+      method: 'POST',
+      isAdmin: true,
+      body: data
+    });
+  }
+
   async adminToggleCurriculum(topicId) {
     return this.request(`/api/admin/curriculum/${encodeURIComponent(topicId)}/toggle`, {
       method: 'PATCH',
@@ -298,6 +306,33 @@ class ApiClient {
   async adminResetCurriculum() {
     return this.request('/api/admin/curriculum/reset', {
       method: 'POST',
+      isAdmin: true
+    });
+  }
+
+  // Activities Management
+  async adminGetActivities() {
+    return this.request('/api/admin/activities', { isAdmin: true });
+  }
+
+  async adminCreateActivity(data) {
+    return this.request('/api/admin/activities', {
+      method: 'POST',
+      isAdmin: true,
+      body: data
+    });
+  }
+
+  async adminToggleActivity(activityId) {
+    return this.request(`/api/admin/activities/${encodeURIComponent(activityId)}/toggle`, {
+      method: 'PATCH',
+      isAdmin: true
+    });
+  }
+
+  async adminDeleteActivity(activityId) {
+    return this.request(`/api/admin/activities/${encodeURIComponent(activityId)}`, {
+      method: 'DELETE',
       isAdmin: true
     });
   }
@@ -345,6 +380,10 @@ class ApiClient {
 
   async getRoleplays() {
     return this.request('/api/roleplays');
+  }
+
+  async getActivities() {
+    return this.request('/api/activities');
   }
 
   async getLeaderboard(limit = 50) {
